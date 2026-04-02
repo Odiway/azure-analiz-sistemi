@@ -33,7 +33,8 @@ export async function PATCH(
       );
     }
 
-    if (reservation.userId !== userId) {
+    const isAdmin = session.user.role === 'admin';
+    if (reservation.userId !== userId && !isAdmin) {
       return NextResponse.json(
         { error: 'Bu rezervasyonu değiştirme yetkiniz yok' },
         { status: 403 }
@@ -142,7 +143,8 @@ export async function DELETE(
       );
     }
 
-    if (reservation.userId !== userId) {
+    const isAdmin = session.user.role === 'admin';
+    if (reservation.userId !== userId && !isAdmin) {
       return NextResponse.json(
         { error: 'Bu rezervasyonu silme yetkiniz yok' },
         { status: 403 }
