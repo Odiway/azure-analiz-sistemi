@@ -93,9 +93,16 @@ export default function DashboardPage() {
   async function handleCancel(id: number) {
     if (!confirm('Rezervasyonu iptal etmek istediğinize emin misiniz?')) return;
     try {
-      await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Rezervasyon iptal edilemedi');
+        return;
+      }
       fetchData();
-    } catch {}
+    } catch {
+      alert('Bağlantı hatası');
+    }
   }
 
   function handleEdit(reservation: Reservation) {
@@ -419,8 +426,8 @@ export default function DashboardPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    handleCancel(editingReservation.id);
+                  onClick={async () => {
+                    await handleCancel(editingReservation.id);
                     setShowEditModal(false);
                     setEditingReservation(null);
                   }}

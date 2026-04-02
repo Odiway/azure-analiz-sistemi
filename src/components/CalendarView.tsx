@@ -242,9 +242,16 @@ export default function CalendarView() {
   async function handleCancel(id: number) {
     if (!confirm('Rezervasyonu iptal etmek istediğinize emin misiniz?')) return;
     try {
-      await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || 'Rezervasyon iptal edilemedi');
+        return;
+      }
       fetchReservations();
-    } catch {}
+    } catch {
+      alert('Bağlantı hatası');
+    }
   }
 
   const userColorMap = useMemo(() => {
@@ -744,8 +751,8 @@ export default function CalendarView() {
                 {editingReservation && (
                   <button
                     type="button"
-                    onClick={() => {
-                      handleCancel(editingReservation.id);
+                    onClick={async () => {
+                      await handleCancel(editingReservation.id);
                       setShowModal(false);
                       setEditingReservation(null);
                     }}
