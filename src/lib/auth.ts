@@ -64,4 +64,18 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  // Trust Vercel's proxy headers
+  ...(process.env.VERCEL && {
+    cookies: {
+      sessionToken: {
+        name: `next-auth.session-token`,
+        options: {
+          httpOnly: true,
+          sameSite: 'lax' as const,
+          path: '/',
+          secure: true,
+        },
+      },
+    },
+  }),
 };
