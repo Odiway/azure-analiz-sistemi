@@ -12,6 +12,10 @@ import {
   Clock,
   Activity,
   Sparkles,
+  Pencil,
+  Trash2,
+  X,
+  CalendarDays,
 } from 'lucide-react';
 
 interface Reservation {
@@ -36,6 +40,11 @@ export default function DashboardPage() {
   const [upcomingReservations, setUpcomingReservations] = useState<Reservation[]>([]);
   const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ description: '', duration: 60, date: '', hour: 0 });
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -80,6 +89,65 @@ export default function DashboardPage() {
     if (hour < 18) return 'İyi günler';
     return 'İyi akşamlar';
   };
+
+  async function handleCancel(id: number) {
+    if (!confirm('Rezervasyonu iptal etmek istediğinize emin misiniz?')) return;
+    try {
+      await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch {}
+  }
+
+  function handleEdit(reservation: Reservation) {
+    const start = new Date(reservation.startTime);
+    const end = new Date(reservation.endTime);
+    const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+    setEditingReservation(reservation);
+    setEditForm({
+      description: reservation.description || '',
+      duration,
+      date: start.toISOString().split('T')[0],
+      hour: start.getHours(),
+    });
+    setEditError('');
+    setShowEditModal(true);
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingReservation) return;
+
+    setEditSubmitting(true);
+    setEditError('');
+
+    const startTime = new Date(editForm.date);
+    startTime.setHours(editForm.hour, 0, 0, 0);
+    const endTime = new Date(startTime.getTime() + editForm.duration * 60 * 1000);
+
+    try {
+      const res = await fetch(`/api/reservations/${editingReservation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          description: editForm.description,
+        }),
+      });
+      if (res.ok) {
+        setShowEditModal(false);
+        setEditingReservation(null);
+        fetchData();
+      } else {
+        const data = await res.json();
+        setEditError(data.error || 'Bir hata oluştu');
+      }
+    } catch {
+      setEditError('Bağlantı hatası');
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -153,7 +221,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               upcomingReservations.map((r) => (
-                <div key={r.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-navy-50/30 transition-colors">
+                <div key={r.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-navy-50/30 transition-colors group">
                   <div className="w-10 h-10 bg-azure-50/60 rounded-xl flex items-center justify-center shrink-0">
                     <span className="text-sm font-bold text-azure-600">
                       {new Date(r.startTime).getDate()}
@@ -175,10 +243,26 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   {r.description && (
-                    <span className="text-xs text-navy-300 truncate max-w-[120px]">
+                    <span className="text-xs text-navy-300 truncate max-w-[120px] hidden sm:block">
                       {r.description}
                     </span>
                   )}
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <button
+                      onClick={() => handleEdit(r)}
+                      className="p-1.5 hover:bg-azure-50/80 rounded-lg transition-colors"
+                      title="Düzenle"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-azure-500" />
+                    </button>
+                    <button
+                      onClick={() => handleCancel(r.id)}
+                      className="p-1.5 hover:bg-red-50/80 rounded-lg transition-colors"
+                      title="İptal Et"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -234,6 +318,135 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Reservation Modal */}
+      {showEditModal && editingReservation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-navy-900/30 backdrop-blur-md" onClick={() => { setShowEditModal(false); setEditingReservation(null); }} />
+          <div className="relative bg-white/95 backdrop-blur-2xl rounded-2xl shadow-elevated border border-navy-100/40 w-full max-w-md p-6 z-10 animate-scale-in">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-navy-900">Rezervasyonu Düzenle</h3>
+                <p className="text-sm text-navy-400 mt-1">{editingReservation.userName}</p>
+              </div>
+              <button
+                onClick={() => { setShowEditModal(false); setEditingReservation(null); }}
+                className="p-2.5 hover:bg-navy-50/60 rounded-xl transition-colors"
+              >
+                <X className="w-5 h-5 text-navy-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-navy-700 mb-2">
+                  <CalendarDays className="w-4 h-4 inline mr-1" />
+                  Tarih ve Saat
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="date"
+                    value={editForm.date}
+                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                    className="px-3 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
+                  />
+                  <select
+                    value={editForm.hour}
+                    onChange={(e) => setEditForm({ ...editForm, hour: parseInt(e.target.value) })}
+                    className="px-3 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
+                  >
+                    {Array.from({ length: 24 }, (_, i) => (
+                      <option key={i} value={i}>
+                        {i.toString().padStart(2, '0')}:00
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy-700 mb-2">
+                  <Clock className="w-4 h-4 inline mr-1" />
+                  Süre (dakika)
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[30, 60, 120, 180].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, duration: d })}
+                      className={`p-2.5 text-sm rounded-xl border transition-all duration-200 ${
+                        editForm.duration === d
+                          ? 'bg-gradient-to-r from-azure-500 to-azure-600 text-white border-azure-500 shadow-md shadow-azure-500/20'
+                          : 'bg-white/80 text-navy-600 border-navy-200/50 hover:border-azure-300'
+                      }`}
+                    >
+                      {d >= 60 ? `${d / 60} saat` : `${d} dk`}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="15"
+                  max="480"
+                  step="15"
+                  value={editForm.duration}
+                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 60 })}
+                  className="mt-2 w-full px-4 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
+                  placeholder="Özel süre (dakika)"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-navy-700 mb-2">
+                  Açıklama (opsiyonel)
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none resize-none transition-all"
+                  rows={3}
+                  placeholder="Yapılacak analiz hakkında kısa açıklama..."
+                />
+              </div>
+
+              {editError && (
+                <div className="p-3.5 bg-red-50/80 border border-red-200/60 rounded-xl text-sm text-red-700 animate-slide-down">
+                  {editError}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCancel(editingReservation.id);
+                    setShowEditModal(false);
+                    setEditingReservation(null);
+                  }}
+                  className="px-4 py-3 border border-red-200/50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50/60 transition-all duration-200"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowEditModal(false); setEditingReservation(null); }}
+                  className="flex-1 px-4 py-3 border border-navy-200/50 text-navy-600 rounded-xl text-sm font-medium hover:bg-navy-50/60 transition-all duration-200"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-azure-500 to-azure-600 text-white rounded-xl text-sm font-semibold hover:from-azure-600 hover:to-azure-700 disabled:opacity-60 transition-all duration-300 shadow-lg shadow-azure-500/20"
+                >
+                  {editSubmitting ? 'Güncelleniyor...' : 'Güncelle'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
