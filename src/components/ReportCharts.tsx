@@ -113,23 +113,23 @@ export default function ReportCharts() {
       })) || [];
 
   return (
-    <div>
+    <div className="animate-fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Raporlar</h2>
-          <p className="text-gray-500 text-sm mt-1">Azure sunucu kullanım istatistikleri</p>
+          <h2 className="text-[26px] font-bold text-navy-900 tracking-tight">Raporlar</h2>
+          <p className="text-navy-400 text-sm mt-1">Azure sunucu kullanım istatistikleri</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="flex bg-white/70 backdrop-blur-sm border border-navy-100/40 rounded-xl overflow-hidden p-1">
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPeriod(p.value)}
-                className={`px-4 py-2 text-sm font-medium transition-all ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                   period === p.value
-                    ? 'bg-azure-500 text-white'
-                    : 'text-gray-600 hover:bg-gray-50'
+                    ? 'bg-white text-navy-900 shadow-sm'
+                    : 'text-navy-400 hover:text-navy-700'
                 }`}
               >
                 {p.label}
@@ -138,7 +138,7 @@ export default function ReportCharts() {
           </div>
           <button
             onClick={exportCSV}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 border border-navy-200/50 text-navy-600 rounded-xl text-sm font-medium hover:bg-navy-50/60 transition-all duration-200"
           >
             <Download className="w-4 h-4" />
             CSV
@@ -149,8 +149,8 @@ export default function ReportCharts() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl p-6 border border-gray-100 animate-pulse">
-              <div className="h-16 bg-gray-100 rounded-lg" />
+            <div key={i} className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40 animate-pulse">
+              <div className="h-16 bg-navy-50/50 rounded-xl" />
             </div>
           ))}
         </div>
@@ -158,87 +158,57 @@ export default function ReportCharts() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-azure-50 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-azure-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{data.summary.totalReservations}</p>
-                  <p className="text-xs text-gray-500">Toplam Rezervasyon</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-emerald-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{data.summary.totalHours}</p>
-                  <p className="text-xs text-gray-500">Toplam Saat</p>
+            {[
+              { icon: Calendar, label: 'Toplam Rezervasyon', value: data.summary.totalReservations, color: 'azure' },
+              { icon: Clock, label: 'Toplam Saat', value: data.summary.totalHours, color: 'emerald' },
+              { icon: Users, label: 'Aktif Kullanıcı', value: data.userStats.length, color: 'purple' },
+              { icon: TrendingUp, label: 'Ort. Saat/Rez.', value: data.summary.totalReservations > 0 ? (data.summary.totalHours / data.summary.totalReservations).toFixed(1) : '0', color: 'amber' },
+            ].map((card, i) => (
+              <div key={i} className="bg-white/70 backdrop-blur-sm rounded-2xl p-5 border border-navy-100/40 hover:bg-white/90 hover:shadow-card transition-all duration-300">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 bg-${card.color}-50/80 rounded-xl flex items-center justify-center`}>
+                    <card.icon className={`w-[18px] h-[18px] text-${card.color}-500`} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-navy-900">{card.value}</p>
+                    <p className="text-xs text-navy-400">{card.label}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-                  <Users className="w-5 h-5 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">{data.userStats.length}</p>
-                  <p className="text-xs text-gray-500">Aktif Kullanıcı</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {data.summary.totalReservations > 0
-                      ? (data.summary.totalHours / data.summary.totalReservations).toFixed(1)
-                      : '0'}
-                  </p>
-                  <p className="text-xs text-gray-500">Ort. Saat/Rez.</p>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Daily Usage Bar Chart */}
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Günlük Kullanım</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40">
+              <h3 className="text-[15px] font-semibold text-navy-800 mb-4">Günlük Kullanım</h3>
               {dailyChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={dailyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e8ecf0" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12, fill: '#8896a8' }} />
+                    <YAxis tick={{ fontSize: 12, fill: '#8896a8' }} />
                     <Tooltip
                       contentStyle={{
                         borderRadius: '12px',
-                        border: '1px solid #e5e7eb',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+                        border: '1px solid rgba(0,0,0,0.06)',
+                        boxShadow: '0 8px 30px -4px rgb(0 0 0 / 0.08)',
+                        backdropFilter: 'blur(12px)',
+                        background: 'rgba(255,255,255,0.92)',
                       }}
                     />
-                    <Bar dataKey="saat" fill="#0078D4" radius={[6, 6, 0, 0]} name="Saat" />
+                    <Bar dataKey="saat" fill="#0078D4" radius={[8, 8, 0, 0]} name="Saat" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+                <div className="h-[300px] flex items-center justify-center text-navy-300 text-sm">
                   Bu dönemde veri yok
                 </div>
               )}
             </div>
 
-            {/* User Distribution Pie */}
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcı Dağılımı</h3>
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40">
+              <h3 className="text-[15px] font-semibold text-navy-800 mb-4">Kullanıcı Dağılımı</h3>
               {pieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -258,21 +228,28 @@ export default function ReportCharts() {
                         <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '12px',
+                        border: '1px solid rgba(0,0,0,0.06)',
+                        boxShadow: '0 8px 30px -4px rgb(0 0 0 / 0.08)',
+                        background: 'rgba(255,255,255,0.92)',
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+                <div className="h-[300px] flex items-center justify-center text-navy-300 text-sm">
                   Bu dönemde veri yok
                 </div>
               )}
             </div>
           </div>
 
-          {/* Activity Categories */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">İşlem Kategorileri</h3>
+          {/* Activity Categories + User Table */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40">
+              <h3 className="text-[15px] font-semibold text-navy-800 mb-4">İşlem Kategorileri</h3>
               {activityPieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
@@ -288,53 +265,60 @@ export default function ReportCharts() {
                         <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '12px',
+                        border: '1px solid rgba(0,0,0,0.06)',
+                        boxShadow: '0 8px 30px -4px rgb(0 0 0 / 0.08)',
+                        background: 'rgba(255,255,255,0.92)',
+                      }}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+                <div className="h-[300px] flex items-center justify-center text-navy-300 text-sm">
                   Bu dönemde veri yok
                 </div>
               )}
             </div>
 
             {/* User Stats Table */}
-            <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Kullanıcı Detayları</h3>
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40">
+              <h3 className="text-[15px] font-semibold text-navy-800 mb-4">Kullanıcı Detayları</h3>
               {data.userStats.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left py-3 text-gray-500 font-medium">Kullanıcı</th>
-                        <th className="text-center py-3 text-gray-500 font-medium">Rez.</th>
-                        <th className="text-center py-3 text-gray-500 font-medium">Saat</th>
+                      <tr className="border-b border-navy-100/40">
+                        <th className="text-left py-3 text-navy-400 font-medium text-xs uppercase tracking-wider">Kullanıcı</th>
+                        <th className="text-center py-3 text-navy-400 font-medium text-xs uppercase tracking-wider">Rez.</th>
+                        <th className="text-center py-3 text-navy-400 font-medium text-xs uppercase tracking-wider">Saat</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data.userStats.map((user, i) => (
-                        <tr key={user.userId} className="border-b border-gray-50">
+                        <tr key={user.userId} className="border-b border-navy-50/30 hover:bg-navy-50/20 transition-colors">
                           <td className="py-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2.5">
                               <div
-                                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold"
                                 style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                               >
                                 {user.userName.charAt(0)}
                               </div>
-                              <span className="font-medium text-gray-900">{user.userName}</span>
+                              <span className="font-medium text-navy-800">{user.userName}</span>
                             </div>
                           </td>
-                          <td className="py-3 text-center text-gray-700">{user.reservationCount}</td>
-                          <td className="py-3 text-center text-gray-700">{user.totalHours}s</td>
+                          <td className="py-3 text-center text-navy-600">{user.reservationCount}</td>
+                          <td className="py-3 text-center text-navy-600">{user.totalHours}s</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+                <div className="h-[300px] flex items-center justify-center text-navy-300 text-sm">
                   Bu dönemde veri yok
                 </div>
               )}

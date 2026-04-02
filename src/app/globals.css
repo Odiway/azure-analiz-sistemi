@@ -2,11 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
   --azure-primary: #0078D4;
-  --azure-dark: #004E8C;
+  --azure-dark: #004578;
+  --navy-bg: #0a0f1e;
+  --navy-surface: #111827;
+  --navy-card: #1a2235;
 }
 
 body {
@@ -15,10 +18,71 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+
+/* Premium glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 12px 28px rgba(0,0,0,0.06);
+  border-color: rgba(0, 120, 212, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Mesh gradient backgrounds */
+.mesh-gradient {
+  background:
+    radial-gradient(at 40% 20%, rgba(0, 120, 212, 0.08) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, rgba(59, 106, 156, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(0, 120, 212, 0.04) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, rgba(37, 68, 107, 0.04) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(0, 120, 212, 0.06) 0px, transparent 50%),
+    #f8fafc;
+}
+
+.mesh-gradient-dark {
+  background:
+    radial-gradient(at 30% 10%, rgba(0, 120, 212, 0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 20%, rgba(37, 68, 107, 0.2) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(0, 69, 120, 0.1) 0px, transparent 50%),
+    #080e18;
+}
+
+/* 3D perspective grid */
+.perspective-grid {
+  background-image:
+    linear-gradient(rgba(0, 120, 212, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 120, 212, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  perspective: 500px;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -26,34 +90,77 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
+  background: rgba(0, 120, 212, 0.2);
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgba(0, 120, 212, 0.4);
 }
 
-/* Smooth focus transitions */
+/* Smooth transitions for interactive elements */
+input, select, textarea, button, a {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-/* Calendar grid fix */
-.calendar-grid > div {
-  min-height: 48px;
+/* Animated gradient border */
+.gradient-border {
+  position: relative;
+  border: none;
 }
 
-/* Animation for loading skeleton */
-@keyframes shimmer {
-  0% { background-position: -200px 0; }
-  100% { background-position: calc(200px + 100%) 0; }
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(0, 120, 212, 0.3), rgba(0, 120, 212, 0.05), rgba(0, 120, 212, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
-.animate-shimmer {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
+/* Noise texture overlay */
+.noise-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Dot pattern */
+.dot-pattern {
+  background-image: radial-gradient(circle, rgba(0, 120, 212, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Animated blob */
+@keyframes blob {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50% { border-radius: 50% 60% 30% 60% / 40% 70% 50% 60%; }
+  75% { border-radius: 60% 40% 60% 40% / 70% 30% 60% 40%; }
+}
+
+.animate-blob {
+  animation: blob 8s ease-in-out infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }

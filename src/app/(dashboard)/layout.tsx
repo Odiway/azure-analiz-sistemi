@@ -6,9 +6,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen mesh-gradient relative">
+      <div className="absolute inset-0 dot-pattern opacity-30 pointer-events-none" />
       <Navbar />
-      <main className="pt-20 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <main className="relative pt-[76px] pb-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {children}
       </main>
     </div>

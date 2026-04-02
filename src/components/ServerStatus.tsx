@@ -70,36 +70,35 @@ export default function ServerStatus() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 animate-pulse">
-        <div className="h-20 bg-gray-100 rounded-lg" />
+      <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-navy-100/40 animate-pulse">
+        <div className="h-24 bg-navy-50/50 rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div
-      className={`relative overflow-hidden rounded-2xl p-6 shadow-sm border transition-all ${
-        isInUse
-          ? 'bg-gradient-to-br from-orange-50 to-red-50 border-orange-200'
-          : 'bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200'
-      }`}
-    >
-      {/* Decorative circles */}
-      <div
-        className={`absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10 ${
-          isInUse ? 'bg-orange-500' : 'bg-emerald-500'
-        }`}
-      />
-      <div
-        className={`absolute -bottom-4 -left-4 w-20 h-20 rounded-full opacity-5 ${
-          isInUse ? 'bg-red-500' : 'bg-green-500'
-        }`}
-      />
+    <div className="relative overflow-hidden rounded-2xl p-6 border backdrop-blur-sm transition-all duration-300">
+      {/* Background styling based on state */}
+      {isInUse ? (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/90 via-orange-50/80 to-red-50/70 backdrop-blur-sm" />
+          <div className="absolute -top-12 -right-12 w-40 h-40 bg-orange-500/[0.06] rounded-full blur-2xl" />
+          <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-amber-500/[0.04] rounded-full blur-xl" />
+          <div className="absolute inset-0 border border-orange-200/60 rounded-2xl" />
+        </>
+      ) : (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/90 via-green-50/80 to-teal-50/70 backdrop-blur-sm" />
+          <div className="absolute -top-12 -right-12 w-40 h-40 bg-emerald-500/[0.06] rounded-full blur-2xl" />
+          <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-green-500/[0.04] rounded-full blur-xl" />
+          <div className="absolute inset-0 border border-emerald-200/60 rounded-2xl" />
+        </>
+      )}
 
       <div className="relative">
-        <div className="flex items-center gap-3 mb-4">
+        <div className="flex items-center gap-3.5 mb-5">
           <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            className={`w-11 h-11 rounded-xl flex items-center justify-center ${
               isInUse ? 'bg-orange-500/10' : 'bg-emerald-500/10'
             }`}
           >
@@ -108,13 +107,20 @@ export default function ServerStatus() {
             />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">Azure Sunucu Durumu</h3>
-            <div className="flex items-center gap-1.5">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isInUse ? 'bg-orange-500 animate-pulse' : 'bg-emerald-500'
-                }`}
-              />
+            <h3 className="font-semibold text-navy-800 text-[15px]">Azure Sunucu Durumu</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <div className="relative flex items-center justify-center">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    isInUse ? 'bg-orange-500' : 'bg-emerald-500'
+                  }`}
+                />
+                <div
+                  className={`absolute w-2 h-2 rounded-full animate-ping ${
+                    isInUse ? 'bg-orange-500' : 'bg-emerald-500'
+                  }`}
+                />
+              </div>
               <span
                 className={`text-sm font-medium ${
                   isInUse ? 'text-orange-700' : 'text-emerald-700'
@@ -127,17 +133,17 @@ export default function ServerStatus() {
         </div>
 
         {isInUse && currentReservation && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm text-gray-700">
+          <div className="space-y-3 bg-white/40 rounded-xl p-4 border border-white/60">
+            <div className="flex items-center gap-2.5 text-sm text-navy-700">
               <User className="w-4 h-4 text-orange-500" />
               <span className="font-medium">{currentReservation.userName}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex items-center gap-2.5 text-sm text-navy-600">
               <Clock className="w-4 h-4 text-orange-400" />
               <span>Kalan süre: <strong className="text-orange-700">{timeLeft}</strong></span>
             </div>
             {currentReservation.description && (
-              <p className="text-xs text-gray-500 bg-white/50 rounded-lg px-3 py-2">
+              <p className="text-xs text-navy-500 bg-white/50 rounded-lg px-3 py-2">
                 {currentReservation.description}
               </p>
             )}
@@ -145,11 +151,11 @@ export default function ServerStatus() {
         )}
 
         {!isInUse && nextReservation && (
-          <div className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+          <div className="mt-1 flex items-center gap-2.5 text-sm text-navy-600 bg-white/40 rounded-xl px-4 py-3 border border-white/60">
             <Zap className="w-4 h-4 text-emerald-500" />
             <span>
               Sonraki rezervasyon:{' '}
-              <strong>
+              <strong className="text-navy-800">
                 {new Intl.DateTimeFormat('tr-TR', {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -162,7 +168,7 @@ export default function ServerStatus() {
         )}
 
         {!isInUse && !nextReservation && (
-          <p className="text-sm text-emerald-600 mt-1">
+          <p className="text-sm text-emerald-600 mt-1 bg-white/40 rounded-xl px-4 py-3 border border-white/60">
             Bugün için planlanmış rezervasyon yok. Hemen kullanabilirsiniz!
           </p>
         )}
