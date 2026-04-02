@@ -6,7 +6,7 @@ import { eq } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, department } = await req.json();
+    const { name, email, password, department, role } = await req.json();
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const validRole = ['user', 'admin'].includes(role) ? role : 'user';
 
     const existing = await db.query.users.findFirst({
       where: eq(users.email, email),
@@ -42,6 +44,7 @@ export async function POST(req: NextRequest) {
         email,
         passwordHash,
         department: department || null,
+        role: validRole,
       })
       .returning({ id: users.id, name: users.name, email: users.email });
 

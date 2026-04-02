@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Server,
+  Settings,
 } from 'lucide-react';
 
 const navItems = [
@@ -103,6 +104,19 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+              {session?.user?.role === 'admin' && (
+                <Link
+                  href="/settings"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 ${
+                    pathname === '/settings'
+                      ? 'bg-white text-navy-900 shadow-sm'
+                      : 'text-navy-400 hover:text-navy-700'
+                  }`}
+                >
+                  <Settings className="w-4 h-4" />
+                  Ayarlar
+                </Link>
+              )}
             </div>
 
             {/* Right side */}
@@ -209,6 +223,20 @@ export default function Navbar() {
                   </Link>
                 );
               })}
+              {session?.user?.role === 'admin' && (
+                <Link
+                  href="/settings"
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                    pathname === '/settings'
+                      ? 'bg-azure-50/60 text-azure-600'
+                      : 'text-navy-500 hover:bg-navy-50/60'
+                  }`}
+                >
+                  <Settings className="w-5 h-5" />
+                  Ayarlar
+                </Link>
+              )}
               <div className="pt-2 mt-2 border-t border-navy-100/40">
                 <button
                   onClick={() => signOut({ callbackUrl: '/login' })}

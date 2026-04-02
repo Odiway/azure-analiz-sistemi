@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Server, Mail, Lock, User, Building, ArrowRight, AlertCircle, CheckCircle, Calendar, BarChart3, Bell } from 'lucide-react';
+import { Server, Mail, Lock, User, Building, ArrowRight, AlertCircle, CheckCircle, Calendar, BarChart3, Bell, Shield } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -13,6 +13,7 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
     department: '',
+    role: 'user',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,6 +43,7 @@ export default function RegisterPage() {
           email: formData.email,
           password: formData.password,
           department: formData.department,
+          role: formData.role,
         }),
       });
 
@@ -189,6 +191,43 @@ export default function RegisterPage() {
                     placeholder="Yapısal Analiz"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-navy-700">Rol</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'user' })}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-200 ${
+                    formData.role === 'user'
+                      ? 'bg-azure-50/60 border-azure-500/40 ring-2 ring-azure-500/20'
+                      : 'bg-white/80 border-navy-200/60 hover:border-azure-300'
+                  }`}
+                >
+                  <User className={`w-5 h-5 ${formData.role === 'user' ? 'text-azure-500' : 'text-navy-300'}`} />
+                  <div className="text-left">
+                    <span className={`text-sm font-medium ${formData.role === 'user' ? 'text-azure-700' : 'text-navy-700'}`}>Kullanıcı</span>
+                    <p className="text-[10px] text-navy-400">Standart erişim</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'admin' })}
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-200 ${
+                    formData.role === 'admin'
+                      ? 'bg-purple-50/60 border-purple-500/40 ring-2 ring-purple-500/20'
+                      : 'bg-white/80 border-navy-200/60 hover:border-purple-300'
+                  }`}
+                >
+                  <Shield className={`w-5 h-5 ${formData.role === 'admin' ? 'text-purple-500' : 'text-navy-300'}`} />
+                  <div className="text-left">
+                    <span className={`text-sm font-medium ${formData.role === 'admin' ? 'text-purple-700' : 'text-navy-700'}`}>Admin</span>
+                    <p className="text-[10px] text-navy-400">Tam yönetim</p>
+                  </div>
+                </button>
               </div>
             </div>
 
