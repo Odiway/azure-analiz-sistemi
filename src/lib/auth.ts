@@ -1,32 +1,30 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
-import { db } from './db';
-import { users } from './schema';
-import { eq } from 'drizzle-orm';
+import { getSQL } from './db';
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
-        email: { label: 'Email', type: 'email' },
+        email: { label: 'Kullanıcı Adı', type: 'text' },
         password: { label: 'Şifre', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email ve şifre gereklidir');
+          throw new Error('Kullanıcı adı ve şifre gereklidir');
         }
 
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email),
-        });
+        const sql = getSQL();
+        const rows = await sql`SELECT * FROM users WHERE email = ${credentials.email} LIMIT 1`;
 
-        if (!user) {
+        if (rows.length === 0) {
           throw new Error('Kullanıcı bulunamadı');
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.passwordHash);
+        const user = rows[0];
+        const isValid = await bcrypt.compare(credentials.password, user.password_hash);
         if (!isValid) {
           throw new Error('Geçersiz şifre');
         }
@@ -35,8 +33,6 @@ export const authOptions: NextAuthOptions = {
           id: user.id.toString(),
           name: user.name,
           email: user.email,
-          department: user.department || undefined,
-          role: user.role,
         };
       },
     }),
@@ -49,16 +45,12 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.department = user.department;
-        token.role = user.role;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id;
-        session.user.department = token.department;
-        session.user.role = token.role;
+        session.user.id = token.id as string;
       }
       return session;
     },
@@ -67,18 +59,4 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
   },
   secret: process.env.NEXTAUTH_SECRET,
-  // Trust Vercel's proxy headers
-  ...(process.env.VERCEL && {
-    cookies: {
-      sessionToken: {
-        name: `next-auth.session-token`,
-        options: {
-          httpOnly: true,
-          sameSite: 'lax' as const,
-          path: '/',
-          secure: true,
-        },
-      },
-    },
-  }),
 };

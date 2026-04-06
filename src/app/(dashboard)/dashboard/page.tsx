@@ -1,459 +1,352 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import ServerStatus from '@/components/ServerStatus';
-import {
-  Calendar,
-  ClipboardList,
-  FileText,
-  ArrowRight,
-  Clock,
-  Activity,
-  Sparkles,
-  Pencil,
-  Trash2,
-  X,
-  CalendarDays,
-} from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Monitor, LogIn, LogOut, Clock, User, Bell, Wifi, Shield } from 'lucide-react';
 
-interface Reservation {
-  id: number;
+interface ServerStatus {
   userName: string;
-  startTime: string;
-  endTime: string;
-  description: string | null;
-  status: string;
+  userId: number;
+  startedAt: string;
 }
 
-interface ActivityItem {
-  id: number;
-  userName: string;
-  description: string;
-  category: string | null;
-  createdAt: string;
+interface ServersState {
+  'azure-1': ServerStatus | null;
+  'azure-2': ServerStatus | null;
+}
+
+function formatDuration(startedAt: string): string {
+  const start = new Date(startedAt).getTime();
+  const now = Date.now();
+  const diff = Math.max(0, Math.floor((now - start) / 1000));
+  const hours = Math.floor(diff / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  const seconds = diff % 60;
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+  return `${pad(minutes)}:${pad(seconds)}`;
 }
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const [upcomingReservations, setUpcomingReservations] = useState<Reservation[]>([]);
-  const [recentActivities, setRecentActivities] = useState<ActivityItem[]>([]);
+  const [servers, setServers] = useState<ServersState>({ 'azure-1': null, 'azure-2': null });
   const [loading, setLoading] = useState(true);
-  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({ description: '', duration: 60, date: '', hour: 0 });
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const [editError, setEditError] = useState('');
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [, setTick] = useState(0);
+  const [toasts, setToasts] = useState<{ id: number; msg: string; type: 'success' | 'info' }[]>([]);
+  const prevServersRef = useRef<ServersState>({ 'azure-1': null, 'azure-2': null });
+  const toastIdRef = useRef(0);
+  const initialLoadRef = useRef(true);
 
-  useEffect(() => {
-    fetchData();
+  const addToast = useCallback((msg: string, type: 'success' | 'info' = 'info') => {
+    const id = ++toastIdRef.current;
+    setToasts((t) => [...t, { id, msg, type }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
   }, []);
 
-  async function fetchData() {
+  const fetchStatus = useCallback(async () => {
     try {
-      const now = new Date().toISOString();
-      const weekLater = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      const [resRes, actRes] = await Promise.all([
-        fetch(`/api/reservations?start=${now}&end=${weekLater}&status=active`),
-        fetch('/api/activities?limit=5'),
-      ]);
-
-      if (resRes.ok) {
-        const data = await resRes.json();
-        setUpcomingReservations(
-          data
-            .filter((r: Reservation) => new Date(r.startTime) > new Date())
-            .sort(
-              (a: Reservation, b: Reservation) =>
-                new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-            )
-            .slice(0, 5)
-        );
-      }
-
-      if (actRes.ok) {
-        const data = await actRes.json();
-        setRecentActivities(data.slice(0, 5));
-      }
-    } catch {
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Günaydın';
-    if (hour < 18) return 'İyi günler';
-    return 'İyi akşamlar';
-  };
-
-  async function handleCancel(id: number) {
-    if (!confirm('Rezervasyonu iptal etmek istediğinize emin misiniz?')) return;
-    try {
-      const res = await fetch(`/api/reservations/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || 'Rezervasyon iptal edilemedi');
-        return;
-      }
-      fetchData();
-    } catch {
-      alert('Bağlantı hatası');
-    }
-  }
-
-  function handleEdit(reservation: Reservation) {
-    const start = new Date(reservation.startTime);
-    const end = new Date(reservation.endTime);
-    const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
-    setEditingReservation(reservation);
-    setEditForm({
-      description: reservation.description || '',
-      duration,
-      date: start.toISOString().split('T')[0],
-      hour: start.getHours(),
-    });
-    setEditError('');
-    setShowEditModal(true);
-  }
-
-  async function handleEditSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editingReservation) return;
-
-    setEditSubmitting(true);
-    setEditError('');
-
-    const startTime = new Date(editForm.date);
-    startTime.setHours(editForm.hour, 0, 0, 0);
-    const endTime = new Date(startTime.getTime() + editForm.duration * 60 * 1000);
-
-    try {
-      const res = await fetch(`/api/reservations/${editingReservation.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          description: editForm.description,
-        }),
+      const res = await fetch(`/api/servers/status?_=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' },
       });
       if (res.ok) {
-        setShowEditModal(false);
-        setEditingReservation(null);
-        fetchData();
-      } else {
-        const data = await res.json();
-        setEditError(data.error || 'Bir hata oluştu');
+        const data: ServersState = await res.json();
+        if (!initialLoadRef.current) {
+          const prev = prevServersRef.current;
+          for (const name of ['azure-1', 'azure-2'] as const) {
+            const displayName = name === 'azure-1' ? 'Azure 1' : 'Azure 2';
+            if (prev[name] && !data[name]) {
+              addToast(`${displayName} artık müsait!`, 'success');
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Sunucu Müsait', { body: `${displayName} artık boş!`, icon: '🟢' });
+              }
+            }
+            if (!prev[name] && data[name]) {
+              const currentId = session?.user?.id ? parseInt(session.user.id) : null;
+              if (data[name]!.userId !== currentId) {
+                addToast(`${displayName} → ${data[name]!.userName} giriş yaptı`, 'info');
+              }
+            }
+          }
+        }
+        initialLoadRef.current = false;
+        prevServersRef.current = data;
+        setServers(data);
       }
-    } catch {
-      setEditError('Bağlantı hatası');
-    } finally {
-      setEditSubmitting(false);
+    } catch {} finally {
+      setLoading(false);
     }
+  }, [addToast, session?.user?.id]);
+
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 2000);
+    return () => clearInterval(interval);
+  }, [fetchStatus]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  async function handleEnter(serverName: string) {
+    setActionLoading(serverName);
+    try {
+      const res = await fetch('/api/servers/enter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || 'Hata oluştu', 'info');
+      } else {
+        addToast(`Giriş başarılı!`, 'success');
+      }
+      await fetchStatus();
+    } catch {
+      addToast('Bağlantı hatası', 'info');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleExit(serverName: string) {
+    setActionLoading(serverName);
+    try {
+      const res = await fetch('/api/servers/exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || 'Hata oluştu', 'info');
+      } else {
+        addToast(`Çıkış başarılı!`, 'success');
+      }
+      await fetchStatus();
+    } catch {
+      addToast('Bağlantı hatası', 'info');
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  const currentUserId = session?.user?.id ? parseInt(session.user.id) : null;
+  const userInServer = Object.entries(servers).find(([, s]) => s && s.userId === currentUserId);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <div className="relative w-16 h-16 mx-auto">
+            <div className="absolute inset-0 border-4 border-azure-200 rounded-full" />
+            <div className="absolute inset-0 border-4 border-azure-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+          <p className="text-navy-400 text-sm font-medium">Sunucu durumu yükleniyor...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Welcome */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[26px] font-bold text-navy-900 tracking-tight">
-            {greeting()}, {session?.user?.name?.split(' ')[0]}
-          </h1>
-          <p className="text-navy-400 mt-1 text-sm">Azure analiz sunucusu durumuna göz atın</p>
-        </div>
-        <div className="hidden sm:flex items-center gap-1.5 text-xs text-navy-300 bg-white/60 backdrop-blur-sm px-3 py-1.5 rounded-full border border-navy-100/40">
-          <Sparkles className="w-3 h-3" />
-          <span>{new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in py-4">
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-3xl font-extrabold text-navy-900 tracking-tight">
+          Hoş geldin, <span className="text-azure-500">{session?.user?.name}</span>
+        </h1>
+        <div className="flex items-center justify-center gap-2 mt-3">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+            <Wifi className="w-3 h-3" />
+            Canlı
+          </div>
+          <span className="text-navy-300 text-xs">Her 2 saniyede güncellenir</span>
         </div>
       </div>
 
-      {/* Server Status + Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2">
-          <ServerStatus />
-        </div>
-        <div className="space-y-2.5">
-          {[
-            { href: '/calendar', icon: Calendar, title: 'Rezervasyon Yap', desc: 'Takvime git', color: 'azure' },
-            { href: '/activities', icon: ClipboardList, title: 'İşlem Kaydet', desc: 'Yeni işlem gir', color: 'emerald' },
-            { href: '/reports', icon: FileText, title: 'Raporları Gör', desc: 'İstatistiklere bak', color: 'purple' },
-          ].map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-4 p-4 bg-white/70 backdrop-blur-sm rounded-2xl border border-navy-100/40 hover:bg-white/90 hover:border-navy-200/50 hover:shadow-card transition-all duration-300 group"
+      {/* Server Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {(['azure-1', 'azure-2'] as const).map((serverName) => {
+          const status = servers[serverName];
+          const isOccupied = !!status;
+          const isMe = status && status.userId === currentUserId;
+          const imInOther = userInServer && userInServer[0] !== serverName;
+          const displayName = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
+          const serverNum = serverName === 'azure-1' ? '01' : '02';
+
+          return (
+            <div
+              key={serverName}
+              className={`relative overflow-hidden rounded-3xl transition-all duration-500 ${
+                isOccupied
+                  ? isMe
+                    ? 'ring-2 ring-azure-400 shadow-2xl shadow-azure-100'
+                    : 'ring-2 ring-red-400 shadow-2xl shadow-red-100'
+                  : 'ring-1 ring-green-300 shadow-xl shadow-green-50 hover:shadow-2xl hover:shadow-green-100'
+              }`}
             >
-              <div className={`w-10 h-10 bg-${item.color}-50/80 rounded-xl flex items-center justify-center group-hover:bg-${item.color}-100/80 transition-colors`}>
-                <item.icon className={`w-[18px] h-[18px] text-${item.color}-500`} />
-              </div>
-              <div className="flex-1">
-                <span className="text-sm font-semibold text-navy-800">{item.title}</span>
-                <p className="text-xs text-navy-400">{item.desc}</p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-navy-200 group-hover:text-azure-500 group-hover:translate-x-0.5 transition-all" />
-            </Link>
-          ))}
-        </div>
-      </div>
+              {/* Top gradient bar */}
+              <div
+                className={`h-1.5 ${
+                  isOccupied
+                    ? isMe
+                      ? 'bg-gradient-to-r from-azure-400 via-azure-500 to-blue-600'
+                      : 'bg-gradient-to-r from-red-400 via-red-500 to-rose-600'
+                    : 'bg-gradient-to-r from-emerald-400 via-green-500 to-teal-500'
+                }`}
+              />
 
-      {/* Upcoming Reservations + Recent Activities */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Upcoming Reservations */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-navy-100/40 overflow-hidden">
-          <div className="px-6 py-4 border-b border-navy-50/60 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-azure-50/80 flex items-center justify-center">
-                <Clock className="w-3.5 h-3.5 text-azure-500" />
-              </div>
-              <h3 className="font-semibold text-navy-800 text-[15px]">Yaklaşan Rezervasyonlar</h3>
-            </div>
-            <Link href="/calendar" className="text-xs text-azure-500 hover:text-azure-600 font-medium transition-colors">
-              Tümünü gör
-            </Link>
-          </div>
-          <div className="divide-y divide-navy-50/40">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="w-6 h-6 border-2 border-navy-200 border-t-azure-500 rounded-full animate-spin mx-auto" />
-              </div>
-            ) : upcomingReservations.length === 0 ? (
-              <div className="p-10 text-center">
-                <Calendar className="w-10 h-10 text-navy-200 mx-auto mb-2" />
-                <p className="text-sm text-navy-400">Yaklaşan rezervasyon yok</p>
-              </div>
-            ) : (
-              upcomingReservations.map((r) => (
-                <div key={r.id} className="px-6 py-3.5 flex items-center gap-4 hover:bg-navy-50/30 transition-colors group">
-                  <div className="w-10 h-10 bg-azure-50/60 rounded-xl flex items-center justify-center shrink-0">
-                    <span className="text-sm font-bold text-azure-600">
-                      {new Date(r.startTime).getDate()}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-navy-800 truncate">{r.userName}</p>
-                    <p className="text-xs text-navy-400">
-                      {new Date(r.startTime).toLocaleString('tr-TR', {
-                        weekday: 'short',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}{' '}
-                      -{' '}
-                      {new Date(r.endTime).toLocaleTimeString('tr-TR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
-                  {r.description && (
-                    <span className="text-xs text-navy-300 truncate max-w-[120px] hidden sm:block">
-                      {r.description}
-                    </span>
-                  )}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                    <button
-                      onClick={() => handleEdit(r)}
-                      className="p-1.5 hover:bg-azure-50/80 rounded-lg transition-colors"
-                      title="Düzenle"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-azure-500" />
-                    </button>
-                    <button
-                      onClick={() => handleCancel(r.id)}
-                      className="p-1.5 hover:bg-red-50/80 rounded-lg transition-colors"
-                      title="İptal Et"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Recent Activities */}
-        <div className="bg-white/70 backdrop-blur-sm rounded-2xl border border-navy-100/40 overflow-hidden">
-          <div className="px-6 py-4 border-b border-navy-50/60 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50/80 flex items-center justify-center">
-                <Activity className="w-3.5 h-3.5 text-emerald-500" />
-              </div>
-              <h3 className="font-semibold text-navy-800 text-[15px]">Son İşlemler</h3>
-            </div>
-            <Link href="/activities" className="text-xs text-azure-500 hover:text-azure-600 font-medium transition-colors">
-              Tümünü gör
-            </Link>
-          </div>
-          <div className="divide-y divide-navy-50/40">
-            {loading ? (
-              <div className="p-8 text-center">
-                <div className="w-6 h-6 border-2 border-navy-200 border-t-azure-500 rounded-full animate-spin mx-auto" />
-              </div>
-            ) : recentActivities.length === 0 ? (
-              <div className="p-10 text-center">
-                <ClipboardList className="w-10 h-10 text-navy-200 mx-auto mb-2" />
-                <p className="text-sm text-navy-400">Henüz işlem kaydı yok</p>
-              </div>
-            ) : (
-              recentActivities.map((a) => (
-                <div key={a.id} className="px-6 py-3.5 hover:bg-navy-50/30 transition-colors">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-navy-800">{a.userName}</span>
-                    <span className="text-[10px] text-navy-300">
-                      {new Date(a.createdAt).toLocaleString('tr-TR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-navy-500 truncate">{a.description}</p>
-                  {a.category && (
-                    <span className="text-[10px] text-azure-600 bg-azure-50/60 px-2 py-0.5 rounded-full mt-1.5 inline-block font-medium">
-                      {a.category}
-                    </span>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Edit Reservation Modal */}
-      {showEditModal && editingReservation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-navy-900/30 backdrop-blur-md" onClick={() => { setShowEditModal(false); setEditingReservation(null); }} />
-          <div className="relative bg-white/95 backdrop-blur-2xl rounded-2xl shadow-elevated border border-navy-100/40 w-full max-w-md p-6 z-10 animate-scale-in">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-navy-900">Rezervasyonu Düzenle</h3>
-                <p className="text-sm text-navy-400 mt-1">{editingReservation.userName}</p>
-              </div>
-              <button
-                onClick={() => { setShowEditModal(false); setEditingReservation(null); }}
-                className="p-2.5 hover:bg-navy-50/60 rounded-xl transition-colors"
-              >
-                <X className="w-5 h-5 text-navy-400" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-navy-700 mb-2">
-                  <CalendarDays className="w-4 h-4 inline mr-1" />
-                  Tarih ve Saat
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="date"
-                    value={editForm.date}
-                    onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                    className="px-3 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
-                  />
-                  <select
-                    value={editForm.hour}
-                    onChange={(e) => setEditForm({ ...editForm, hour: parseInt(e.target.value) })}
-                    className="px-3 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
-                  >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={i}>
-                        {i.toString().padStart(2, '0')}:00
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-navy-700 mb-2">
-                  <Clock className="w-4 h-4 inline mr-1" />
-                  Süre (dakika)
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {[30, 60, 120, 180].map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setEditForm({ ...editForm, duration: d })}
-                      className={`p-2.5 text-sm rounded-xl border transition-all duration-200 ${
-                        editForm.duration === d
-                          ? 'bg-gradient-to-r from-azure-500 to-azure-600 text-white border-azure-500 shadow-md shadow-azure-500/20'
-                          : 'bg-white/80 text-navy-600 border-navy-200/50 hover:border-azure-300'
+              <div className="bg-white p-7">
+                {/* Header row */}
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`relative w-14 h-14 rounded-2xl flex items-center justify-center ${
+                        isOccupied
+                          ? isMe
+                            ? 'bg-azure-500'
+                            : 'bg-red-500'
+                          : 'bg-emerald-500'
                       }`}
                     >
-                      {d >= 60 ? `${d / 60} saat` : `${d} dk`}
+                      <Monitor className="w-7 h-7 text-white" />
+                      {isOccupied && (
+                        <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isMe ? 'bg-azure-400' : 'bg-red-400'} animate-pulse`} />
+                      )}
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span
+                          className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                            isOccupied
+                              ? isMe
+                                ? 'bg-azure-100 text-azure-700'
+                                : 'bg-red-100 text-red-700'
+                              : 'bg-green-100 text-green-700'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${isOccupied ? (isMe ? 'bg-azure-500' : 'bg-red-500') : 'bg-green-500'}`} />
+                          {isOccupied ? (isMe ? 'İçeridesiniz' : 'Meşgul') : 'Müsait'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-4xl font-black text-gray-100 select-none">{serverNum}</span>
+                </div>
+
+                {/* Body */}
+                {isOccupied ? (
+                  <div className="space-y-4">
+                    {/* User info */}
+                    <div className={`rounded-2xl p-4 ${isMe ? 'bg-azure-50 border border-azure-100' : 'bg-red-50 border border-red-100'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isMe ? 'bg-azure-200' : 'bg-red-200'}`}>
+                          <User className={`w-5 h-5 ${isMe ? 'text-azure-700' : 'text-red-700'}`} />
+                        </div>
+                        <div>
+                          <p className={`font-bold text-base ${isMe ? 'text-azure-900' : 'text-red-900'}`}>
+                            {status.userName}
+                          </p>
+                          <p className={`text-xs ${isMe ? 'text-azure-500' : 'text-red-500'}`}>
+                            {isMe ? 'Siz içeridesiniz' : 'Kullanıcı sunucu içerisinde'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Timer */}
+                    <div className={`rounded-2xl p-4 text-center ${isMe ? 'bg-gradient-to-br from-azure-50 to-blue-50 border border-azure-100' : 'bg-gradient-to-br from-red-50 to-rose-50 border border-red-100'}`}>
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <Clock className={`w-4 h-4 ${isMe ? 'text-azure-400' : 'text-red-400'}`} />
+                        <span className={`text-xs font-medium ${isMe ? 'text-azure-500' : 'text-red-500'}`}>
+                          Geçen Süre
+                        </span>
+                      </div>
+                      <p className={`text-3xl font-mono font-black tracking-widest ${isMe ? 'text-azure-700' : 'text-red-700'}`}>
+                        {formatDuration(status.startedAt)}
+                      </p>
+                    </div>
+
+                    {/* Action */}
+                    {isMe ? (
+                      <button
+                        onClick={() => handleExit(serverName)}
+                        disabled={actionLoading === serverName}
+                        className="w-full py-3.5 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-2xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2.5 shadow-lg shadow-red-200/60 active:scale-[0.98]"
+                      >
+                        <LogOut className="w-5 h-5" />
+                        {actionLoading === serverName ? 'Çıkılıyor...' : 'Sunucudan Çıkış Yap'}
+                      </button>
+                    ) : (
+                      <div className="rounded-2xl bg-red-50 border border-red-200 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Shield className="w-4 h-4 text-red-400" />
+                          <span className="text-red-600 font-semibold text-sm">
+                            {status.userName} içeride — Müsait değil
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Empty state */}
+                    <div className="rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 p-6 text-center">
+                      <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <Monitor className="w-6 h-6 text-green-600" />
+                      </div>
+                      <p className="text-green-800 font-semibold">Sunucu Müsait</p>
+                      <p className="text-green-500 text-xs mt-1">Kimse bu sunucuyu kullanmıyor</p>
+                    </div>
+
+                    {/* Enter button */}
+                    <button
+                      onClick={() => handleEnter(serverName)}
+                      disabled={actionLoading === serverName || !!imInOther}
+                      className={`w-full py-3.5 rounded-2xl font-bold transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] ${
+                        imInOther
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                          : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg shadow-green-200/60 disabled:opacity-50'
+                      }`}
+                    >
+                      <LogIn className="w-5 h-5" />
+                      {actionLoading === serverName
+                        ? 'Giriş yapılıyor...'
+                        : imInOther
+                          ? 'Önce diğer sunucudan çıkın'
+                          : "Azure'dayım — Giriş Yaptım"}
                     </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min="15"
-                  max="480"
-                  step="15"
-                  value={editForm.duration}
-                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 60 })}
-                  className="mt-2 w-full px-4 py-2.5 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none transition-all"
-                  placeholder="Özel süre (dakika)"
-                />
+                  </div>
+                )}
               </div>
+            </div>
+          );
+        })}
+      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-navy-700 mb-2">
-                  Açıklama (opsiyonel)
-                </label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full px-4 py-3 bg-white/80 border border-navy-200/50 rounded-xl text-sm text-navy-900 focus:ring-2 focus:ring-azure-500/20 focus:border-azure-500/40 outline-none resize-none transition-all"
-                  rows={3}
-                  placeholder="Yapılacak analiz hakkında kısa açıklama..."
-                />
-              </div>
-
-              {editError && (
-                <div className="p-3.5 bg-red-50/80 border border-red-200/60 rounded-xl text-sm text-red-700 animate-slide-down">
-                  {editError}
-                </div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await handleCancel(editingReservation.id);
-                    setShowEditModal(false);
-                    setEditingReservation(null);
-                  }}
-                  className="px-4 py-3 border border-red-200/50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-50/60 transition-all duration-200"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowEditModal(false); setEditingReservation(null); }}
-                  className="flex-1 px-4 py-3 border border-navy-200/50 text-navy-600 rounded-xl text-sm font-medium hover:bg-navy-50/60 transition-all duration-200"
-                >
-                  Vazgeç
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSubmitting}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-azure-500 to-azure-600 text-white rounded-xl text-sm font-semibold hover:from-azure-600 hover:to-azure-700 disabled:opacity-60 transition-all duration-300 shadow-lg shadow-azure-500/20"
-                >
-                  {editSubmitting ? 'Güncelleniyor...' : 'Güncelle'}
-                </button>
-              </div>
-            </form>
+      {/* Toasts */}
+      <div className="fixed bottom-6 right-6 space-y-3 z-50 pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`pointer-events-auto px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up min-w-[260px] border ${
+              t.type === 'success'
+                ? 'bg-emerald-500 text-white border-emerald-400'
+                : 'bg-white text-navy-800 border-navy-100'
+            }`}
+          >
+            <Bell className={`w-4 h-4 flex-shrink-0 ${t.type === 'success' ? 'text-white' : 'text-azure-500'}`} />
+            <span className="font-semibold text-sm">{t.msg}</span>
           </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
