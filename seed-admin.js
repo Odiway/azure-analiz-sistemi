@@ -8,6 +8,7 @@ async function resetAndSeed() {
   );
 
   console.log('Eski tablolar siliniyor...');
+  await sql`DROP TABLE IF EXISTS server_queue CASCADE`;
   await sql`DROP TABLE IF EXISTS notifications CASCADE`;
   await sql`DROP TABLE IF EXISTS activities CASCADE`;
   await sql`DROP TABLE IF EXISTS reservations CASCADE`;
@@ -27,8 +28,18 @@ async function resetAndSeed() {
     id SERIAL PRIMARY KEY,
     server_name VARCHAR(50) NOT NULL,
     user_id INTEGER NOT NULL REFERENCES users(id),
+    estimated_minutes INTEGER DEFAULT 60 NOT NULL,
     started_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     ended_at TIMESTAMPTZ
+  )`;
+
+  await sql`CREATE TABLE server_queue (
+    id SERIAL PRIMARY KEY,
+    server_name VARCHAR(50) NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    position INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    UNIQUE(server_name, user_id)
   )`;
 
   console.log('Kullanıcılar ekleniyor...\n');
