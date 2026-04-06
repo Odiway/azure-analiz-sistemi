@@ -23,9 +23,17 @@ export async function GET() {
     ORDER BY sq.server_name, sq.position ASC
   `;
 
+  // Active analyses (running but user left)
+  const analyses = await sql`
+    SELECT sa.server_name, u.name as user_name, sa.user_id, sa.started_at, sa.estimated_minutes
+    FROM server_analyses sa
+    JOIN users u ON sa.user_id = u.id
+    WHERE sa.completed_at IS NULL
+  `;
+
   const status: Record<string, any> = {
-    'azure-1': { session: null, queue: [] },
-    'azure-2': { session: null, queue: [] },
+    'azure-1': { session: null, queue: [], analysis: null },
+    'azure-2': { session: null, queue: [], analysis: null },
   };
 
   for (const row of sessions) {
@@ -50,6 +58,20 @@ export async function GET() {
         userName: row.user_name,
         position: row.position,
       });
+    }
+  }
+
+  for (const row of analyses) {
+    const name = row.server_name as string;
+    if (name === 'azure-1' || name === 'azure-2') {
+      const raw = String(row.started_at);
+      const startedAt = raw.includes('Z') || raw.includes('+') ? raw : raw + 'Z';
+      status[name].analysis = {
+        userName: row.user_name,
+        userId: row.user_id,
+        startedAt: new Date(startedAt).toISOString(),
+        estimatedMinutes: row.estimated_minutes,
+      };
     }
   }
 

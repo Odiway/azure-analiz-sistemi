@@ -1,10 +1,13 @@
 'use client';
 
 import { signOut, useSession } from 'next-auth/react';
-import { Server, LogOut, User } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { Server, LogOut, User, StickyNote, Monitor } from 'lucide-react';
 
 export default function Navbar() {
   const { data: session } = useSession();
+  const pathname = usePathname();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-2xl shadow-sm border-b border-navy-100/40">
@@ -19,6 +22,32 @@ export default function Navbar() {
               <span className="text-base font-semibold text-navy-900">Azure</span>
               <span className="text-base font-light text-azure-500 ml-1">Sunucu</span>
             </div>
+          </div>
+
+          {/* Nav Links */}
+          <div className="flex items-center gap-1">
+            <Link
+              href="/dashboard"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === '/dashboard'
+                  ? 'bg-azure-50 text-azure-700'
+                  : 'text-navy-500 hover:bg-gray-50 hover:text-navy-700'
+              }`}
+            >
+              <Monitor className="w-4 h-4" />
+              <span className="hidden sm:inline">Sunucular</span>
+            </Link>
+            <Link
+              href="/notes"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === '/notes'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'text-navy-500 hover:bg-gray-50 hover:text-navy-700'
+              }`}
+            >
+              <StickyNote className="w-4 h-4" />
+              <span className="hidden sm:inline">Notlar</span>
+            </Link>
           </div>
 
           {/* User Info & Logout */}

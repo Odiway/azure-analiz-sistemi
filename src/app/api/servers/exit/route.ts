@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { serverName } = await req.json();
+  const { serverName, hasAnalysis, analysisMinutes } = await req.json();
   if (serverName !== 'azure-1' && serverName !== 'azure-2') {
     return NextResponse.json({ error: 'Geçersiz sunucu' }, { status: 400 });
   }
@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
   }
 
   await sql`UPDATE server_sessions SET ended_at = NOW() WHERE id = ${activeSession[0].id}`;
+
+  // If user has a running analysis, create analysis record
+  if (hasAnalysis && analysisMinutes) {
+    const minutes = Math.max(parseInt(analysisMinutes) || 60, 1);
+    await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
+  }
 
   return NextResponse.json({ success: true });
 }

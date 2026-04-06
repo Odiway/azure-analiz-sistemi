@@ -8,6 +8,8 @@ async function resetAndSeed() {
   );
 
   console.log('Eski tablolar siliniyor...');
+  await sql`DROP TABLE IF EXISTS sticky_notes CASCADE`;
+  await sql`DROP TABLE IF EXISTS server_analyses CASCADE`;
   await sql`DROP TABLE IF EXISTS server_queue CASCADE`;
   await sql`DROP TABLE IF EXISTS notifications CASCADE`;
   await sql`DROP TABLE IF EXISTS activities CASCADE`;
@@ -33,6 +35,15 @@ async function resetAndSeed() {
     ended_at TIMESTAMPTZ
   )`;
 
+  await sql`CREATE TABLE server_analyses (
+    id SERIAL PRIMARY KEY,
+    server_name VARCHAR(50) NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    estimated_minutes INTEGER NOT NULL,
+    started_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    completed_at TIMESTAMPTZ
+  )`;
+
   await sql`CREATE TABLE server_queue (
     id SERIAL PRIMARY KEY,
     server_name VARCHAR(50) NOT NULL,
@@ -40,6 +51,14 @@ async function resetAndSeed() {
     position INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     UNIQUE(server_name, user_id)
+  )`;
+
+  await sql`CREATE TABLE sticky_notes (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+    content TEXT NOT NULL DEFAULT '',
+    color VARCHAR(20) NOT NULL DEFAULT 'yellow',
+    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
   )`;
 
   console.log('Kullanıcılar ekleniyor...\n');

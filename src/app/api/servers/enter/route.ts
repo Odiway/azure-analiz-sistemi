@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Geçersiz sunucu' }, { status: 400 });
   }
 
-  const minutes = Math.min(Math.max(parseInt(estimatedMinutes) || 60, 5), 480);
+  const minutes = Math.max(parseInt(estimatedMinutes) || 60, 1);
 
   const sql = getSQL();
   const userId = parseInt(session.user.id);
