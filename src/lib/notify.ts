@@ -43,7 +43,6 @@ export async function sendNtfyToUser(userId: number, title: string, message: str
   }
 }
 
-export async function sendNtfyToAllWithTopic(title: string, message: string) {
 export async function sendNtfyToAllWithTopic(title: string, message: string): Promise<string> {
   try {
     const sql = getSQL();
