@@ -54,8 +54,7 @@ export async function POST(req: NextRequest) {
   sendNtfyToAllWithTopic(
     serverName,
     `${dn} - Giriş Yapıldı`,
-    `${session.user.name} ${dn}'e giriş yaptı. Tahmini süre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`,
-    userId
+    `${session.user.name} ${dn}'e giriş yaptı. Tahmini süre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
   ).catch(() => {});
 
   return NextResponse.json({ success: true });

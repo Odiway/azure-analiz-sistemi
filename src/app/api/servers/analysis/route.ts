@@ -39,8 +39,7 @@ export async function POST(req: NextRequest) {
   sendNtfyToAllWithTopic(
     serverName,
     `${dn} Tamamen Müsait! 🟢`,
-    `${session.user.name} analizi tamamladı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`,
-    userId
+    `${session.user.name} analizi tamamladı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`
   ).catch(() => {});
 
   return NextResponse.json({ success: true });

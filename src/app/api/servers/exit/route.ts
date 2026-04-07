@@ -39,16 +39,14 @@ export async function POST(req: NextRequest) {
     sendNtfyToAllWithTopic(
       serverName,
       `${dn} - Çıkış (Analiz Var)`,
-      `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`,
-      userId
+      `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
     ).catch(() => {});
   } else {
     // Notify everyone: server fully available
     sendNtfyToAllWithTopic(
       serverName,
       `${dn} Müsait! 🟢`,
-      `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`,
-      userId
+      `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`
     ).catch(() => {});
   }
 
