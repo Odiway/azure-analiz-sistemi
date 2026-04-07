@@ -36,18 +36,16 @@ export async function POST(req: NextRequest) {
     await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
 
     // Notify everyone: user left but analysis running
-    sendNtfyToAllWithTopic(
-      serverName,
+    await sendNtfyToAllWithTopic(
       `${dn} - Çıkış (Analiz Var)`,
       `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
-    ).catch(() => {});
+    );
   } else {
     // Notify everyone: server fully available
-    sendNtfyToAllWithTopic(
-      serverName,
+    await sendNtfyToAllWithTopic(
       `${dn} Müsait! 🟢`,
       `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`
-    ).catch(() => {});
+    );
   }
 
   return NextResponse.json({ success: true });

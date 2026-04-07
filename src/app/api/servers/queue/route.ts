@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
     LIMIT 1
   `;
   if (currentUser.length > 0) {
-    sendNtfyToUser(
+    await sendNtfyToUser(
       currentUser[0].user_id,
       `${dn} - Sırada Bekleyen Var`,
       `${session.user.name} ${dn} için sıraya girdi (${nextPos}. sıra).`
-    ).catch(() => {});
+    );
   }
 
   return NextResponse.json({ success: true, position: nextPos });
@@ -88,11 +88,11 @@ export async function DELETE(req: NextRequest) {
 
   const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
   // Notify remaining queue users about their updated position
-  sendNtfyToQueueUsers(
+  await sendNtfyToQueueUsers(
     serverName,
     `${dn} - Sıra Güncellendi`,
     `${session.user.name} sıradan çıktı. Sıranız güncellendi.`
-  ).catch(() => {});
+  );
 
   return NextResponse.json({ success: true });
 }

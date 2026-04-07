@@ -36,11 +36,10 @@ export async function POST(req: NextRequest) {
   await sql`UPDATE server_analyses SET completed_at = NOW() WHERE id = ${active[0].id}`;
 
   // Notify everyone that analysis is done and server is fully free
-  sendNtfyToAllWithTopic(
-    serverName,
+  await sendNtfyToAllWithTopic(
     `${dn} Tamamen Müsait! 🟢`,
     `${session.user.name} analizi tamamladı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`
-  ).catch(() => {});
+  );
 
   return NextResponse.json({ success: true });
 }

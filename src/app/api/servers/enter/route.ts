@@ -51,11 +51,10 @@ export async function POST(req: NextRequest) {
 
   const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
   // Notify everyone: someone entered the server
-  sendNtfyToAllWithTopic(
-    serverName,
+  await sendNtfyToAllWithTopic(
     `${dn} - Giriş Yapıldı`,
     `${session.user.name} ${dn}'e giriş yaptı. Tahmini süre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
-  ).catch(() => {});
+  );
 
   return NextResponse.json({ success: true });
 }
