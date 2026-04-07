@@ -144,7 +144,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) toast(data.error, 'warn');
-      else toast('Giriş başarılı!', 'success');
+      else toast(`Giriş başarılı! (ntfy: ${data.ntfy || 'yok'})`, 'success');
       await fetchStatus();
     } catch { toast('Bağlantı hatası', 'warn'); }
     finally { setActionLoading(null); setShowEnterModal(null); }
@@ -164,7 +164,7 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!res.ok) toast(data.error, 'warn');
-      else toast(exitHasAnalysis ? 'Çıkış yapıldı, analiz devam ediyor' : 'Çıkış başarılı!', 'success');
+      else toast(`${exitHasAnalysis ? 'Çıkış yapıldı, analiz devam ediyor' : 'Çıkış başarılı!'} (ntfy: ${data.ntfy || 'yok'})`, 'success');
       await fetchStatus();
     } catch { toast('Bağlantı hatası', 'warn'); }
     finally { setActionLoading(null); setShowExitModal(null); setExitHasAnalysis(false); }

@@ -51,10 +51,16 @@ export async function POST(req: NextRequest) {
 
   const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
   // Notify everyone: someone entered the server
-  await sendNtfyToAllWithTopic(
-    `${dn} - Giriş Yapıldı`,
-    `${session.user.name} ${dn}'e giriş yaptı. Tahmini süre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
-  );
+  let ntfyResult = 'not_sent';
+  try {
+    await sendNtfyToAllWithTopic(
+      `${dn} - Giri\u015f Yap\u0131ld\u0131`,
+      `${session.user.name} ${dn}'e giri\u015f yapt\u0131. Tahmini s\u00fcre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
+    );
+    ntfyResult = 'sent_ok';
+  } catch (e: any) {
+    ntfyResult = 'error: ' + e.message;
+  }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, ntfy: ntfyResult });
 }

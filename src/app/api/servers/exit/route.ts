@@ -30,23 +30,32 @@ export async function POST(req: NextRequest) {
 
   await sql`UPDATE server_sessions SET ended_at = NOW() WHERE id = ${activeSession[0].id}`;
 
+  let ntfyResult = 'not_sent';
   // If user has a running analysis, create analysis record
   if (hasAnalysis && analysisMinutes) {
     const minutes = Math.max(parseInt(analysisMinutes) || 60, 1);
     await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
 
-    // Notify everyone: user left but analysis running
-    await sendNtfyToAllWithTopic(
-      `${dn} - Çıkış (Analiz Var)`,
-      `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
-    );
+    try {
+      await sendNtfyToAllWithTopic(
+        `${dn} - Çıkış (Analiz Var)`,
+        `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
+      );
+      ntfyResult = 'sent_ok';
+    } catch (e: any) {
+      ntfyResult = 'error: ' + e.message;
+    }
   } else {
-    // Notify everyone: server fully available
-    await sendNtfyToAllWithTopic(
-      `${dn} Müsait! 🟢`,
-      `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`
-    );
+    try {
+      await sendNtfyToAllWithTopic(
+        `${dn} Müsait! 🟢`,
+        `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`
+      );
+      ntfyResult = 'sent_ok';
+    } catch (e: any) {
+      ntfyResult = 'error: ' + e.message;
+    }
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, ntfy: ntfyResult });
 }
