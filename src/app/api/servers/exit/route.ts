@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
-import { sendNtfyToAllWithTopic } from '@/lib/notify';
+import { sendNtfyByEvent } from '@/lib/notify';
+import type { NtfyEvent } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -30,16 +31,19 @@ export async function POST(req: NextRequest) {
 
   await sql`UPDATE server_sessions SET ended_at = NOW() WHERE id = ${activeSession[0].id}`;
 
+  const exitEvent: NtfyEvent = serverName === 'azure-1' ? 'azure-1_exit' : 'azure-2_exit';
   let ntfyResult = 'not_sent';
   if (hasAnalysis && analysisMinutes) {
     const minutes = Math.max(parseInt(analysisMinutes) || 60, 1);
     await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
-    ntfyResult = await sendNtfyToAllWithTopic(
+    ntfyResult = await sendNtfyByEvent(
+      exitEvent,
       `${dn} - Cikis (Analiz Var)`,
       `${session.user.name} ${dn} sunucusundan cikti ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
     );
   } else {
-    ntfyResult = await sendNtfyToAllWithTopic(
+    ntfyResult = await sendNtfyByEvent(
+      exitEvent,
       `${dn} Musait!`,
       `${session.user.name} ${dn} sunucusundan cikti. Sunucu artik tamamen bos, giris yapabilirsiniz!`
     );

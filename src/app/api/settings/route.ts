@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
+import { ALL_EVENTS } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,10 +17,17 @@ export async function GET() {
   const sql = getSQL();
   const userId = parseInt(session.user.id);
 
-  const users = await sql`SELECT ntfy_topic FROM users WHERE id = ${userId} LIMIT 1`;
+  const users = await sql`SELECT ntfy_topic, ntfy_prefs FROM users WHERE id = ${userId} LIMIT 1`;
   
+  let prefs: Record<string, boolean> = {};
+  try {
+    prefs = JSON.parse(users[0]?.ntfy_prefs || '{}');
+  } catch {}
+
   return NextResponse.json({
     ntfyTopic: users[0]?.ntfy_topic || '',
+    ntfyPrefs: prefs,
+    allEvents: ALL_EVENTS,
   });
 }
 
@@ -30,14 +38,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { ntfyTopic } = await req.json();
+  const { ntfyTopic, ntfyPrefs } = await req.json();
   const sql = getSQL();
   const userId = parseInt(session.user.id);
 
-  // Sanitize topic - only allow alphanumeric, hyphens, underscores
+  // Sanitize topic
   const safeTopic = String(ntfyTopic || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 100);
 
-  await sql`UPDATE users SET ntfy_topic = ${safeTopic || null} WHERE id = ${userId}`;
+  // Sanitize prefs - only allow known event keys
+  const validKeys = ALL_EVENTS.map(e => e.key);
+  const safePrefs: Record<string, boolean> = {};
+  if (ntfyPrefs && typeof ntfyPrefs === 'object') {
+    for (const key of validKeys) {
+      if (ntfyPrefs[key] === true) safePrefs[key] = true;
+    }
+  }
 
-  return NextResponse.json({ success: true, ntfyTopic: safeTopic });
+  await sql`UPDATE users SET ntfy_topic = ${safeTopic || null}, ntfy_prefs = ${JSON.stringify(safePrefs)} WHERE id = ${userId}`;
+
+  return NextResponse.json({ success: true, ntfyTopic: safeTopic, ntfyPrefs: safePrefs });
 }

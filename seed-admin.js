@@ -24,6 +24,7 @@ async function resetAndSeed() {
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     ntfy_topic VARCHAR(255),
+    ntfy_prefs TEXT DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
   )`;
 

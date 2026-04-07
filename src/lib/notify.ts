@@ -1,53 +1,48 @@
 import { getSQL } from './db';
 
-export async function sendNtfyToQueueUsers(serverName: string, title: string, message: string) {
-  try {
-    const sql = getSQL();
-    const queueUsers = await sql`
-      SELECT u.ntfy_topic
-      FROM server_queue sq
-      JOIN users u ON sq.user_id = u.id
-      WHERE sq.server_name = ${serverName} AND u.ntfy_topic IS NOT NULL AND u.ntfy_topic != ''
-      ORDER BY sq.position ASC
-    `;
+// Event types for notification preferences
+export type NtfyEvent = 
+  | 'azure-1_enter' | 'azure-1_exit' | 'azure-1_analysis'
+  | 'azure-2_enter' | 'azure-2_exit' | 'azure-2_analysis'
+  | 'queue_waiting';
 
-    for (const row of queueUsers) {
-      try {
-        await fetch(`https://ntfy.sh/${row.ntfy_topic}`, {
-          method: 'POST',
-          body: message,
-          headers: { 'Title': title, 'Tags': 'computer,white_check_mark' },
-        });
-      } catch (e) {
-        console.error('Ntfy send failed for topic:', row.ntfy_topic, e);
-      }
-    }
-  } catch (e) {
-    console.error('sendNtfyToQueueUsers error:', e);
+export const ALL_EVENTS: { key: NtfyEvent; label: string; group: string }[] = [
+  { key: 'azure-1_enter', label: 'Azure 1 - Giris yapildiginda', group: 'Azure 1' },
+  { key: 'azure-1_exit', label: 'Azure 1 - Cikis yapildiginda', group: 'Azure 1' },
+  { key: 'azure-1_analysis', label: 'Azure 1 - Analiz bittiginde', group: 'Azure 1' },
+  { key: 'azure-2_enter', label: 'Azure 2 - Giris yapildiginda', group: 'Azure 2' },
+  { key: 'azure-2_exit', label: 'Azure 2 - Cikis yapildiginda', group: 'Azure 2' },
+  { key: 'azure-2_analysis', label: 'Azure 2 - Analiz bittiginde', group: 'Azure 2' },
+  { key: 'queue_waiting', label: 'Biri sirada beklemeye basladiginda', group: 'Sira' },
+];
+
+function getUserPrefs(ntfyPrefs: string | null): Record<string, boolean> {
+  try {
+    return JSON.parse(ntfyPrefs || '{}');
+  } catch {
+    return {};
   }
 }
 
-export async function sendNtfyToUser(userId: number, title: string, message: string) {
+async function sendToTopic(topic: string, title: string, message: string, tag: string = 'loudspeaker'): Promise<string> {
   try {
-    const sql = getSQL();
-    const users = await sql`SELECT ntfy_topic FROM users WHERE id = ${userId} AND ntfy_topic IS NOT NULL AND ntfy_topic != '' LIMIT 1`;
-    if (users.length === 0) return;
-
-    await fetch(`https://ntfy.sh/${users[0].ntfy_topic}`, {
+    const res = await fetch(`https://ntfy.sh/${topic}`, {
       method: 'POST',
       body: message,
-      headers: { 'Title': title, 'Tags': 'computer,bell' },
+      headers: { 'Title': title, 'Tags': `computer,${tag}` },
     });
-  } catch (e) {
-    console.error('sendNtfyToUser error:', e);
+    return `${topic}:${res.status}`;
+  } catch (e: any) {
+    return `${topic}:ERR:${e.message}`;
   }
 }
 
-export async function sendNtfyToAllWithTopic(title: string, message: string): Promise<string> {
+// Send notification to all users who have the given event enabled
+export async function sendNtfyByEvent(event: NtfyEvent, title: string, message: string): Promise<string> {
   try {
     const sql = getSQL();
     const users = await sql`
-      SELECT ntfy_topic FROM users 
+      SELECT ntfy_topic, ntfy_prefs FROM users 
       WHERE ntfy_topic IS NOT NULL AND ntfy_topic != ''
     `;
 
@@ -55,20 +50,32 @@ export async function sendNtfyToAllWithTopic(title: string, message: string): Pr
 
     const results: string[] = [];
     for (const row of users) {
-      try {
-        const res = await fetch(`https://ntfy.sh/${row.ntfy_topic}`, {
-          method: 'POST',
-          body: message,
-          headers: { 'Title': title, 'Tags': 'computer,loudspeaker' },
-        });
-        const body = await res.text();
-        results.push(`${row.ntfy_topic}:${res.status}`);
-      } catch (e: any) {
-        results.push(`${row.ntfy_topic}:ERR:${e.message}`);
+      const prefs = getUserPrefs(row.ntfy_prefs);
+      if (!prefs[event]) {
+        results.push(`${row.ntfy_topic}:skipped`);
+        continue;
       }
+      const r = await sendToTopic(row.ntfy_topic, title, message);
+      results.push(r);
     }
     return results.join(' | ');
   } catch (e: any) {
     return 'db_error: ' + e.message;
+  }
+}
+
+// Send notification to a specific user (for queue_waiting)
+export async function sendNtfyToUserByEvent(userId: number, event: NtfyEvent, title: string, message: string): Promise<string> {
+  try {
+    const sql = getSQL();
+    const users = await sql`SELECT ntfy_topic, ntfy_prefs FROM users WHERE id = ${userId} AND ntfy_topic IS NOT NULL AND ntfy_topic != '' LIMIT 1`;
+    if (users.length === 0) return 'no_topic';
+
+    const prefs = getUserPrefs(users[0].ntfy_prefs);
+    if (!prefs[event]) return 'pref_disabled';
+
+    return await sendToTopic(users[0].ntfy_topic, title, message, 'bell');
+  } catch (e: any) {
+    return 'error: ' + e.message;
   }
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
-import { sendNtfyToUser, sendNtfyToQueueUsers } from '@/lib/notify';
+import { sendNtfyToUserByEvent } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -49,10 +49,11 @@ export async function POST(req: NextRequest) {
     LIMIT 1
   `;
   if (currentUser.length > 0) {
-    await sendNtfyToUser(
+    await sendNtfyToUserByEvent(
       currentUser[0].user_id,
-      `${dn} - Sırada Bekleyen Var`,
-      `${session.user.name} ${dn} için sıraya girdi (${nextPos}. sıra).`
+      'queue_waiting',
+      `${dn} - Sirada Bekleyen Var`,
+      `${session.user.name} ${dn} icin siraya girdi (${nextPos}. sira).`
     );
   }
 
@@ -87,12 +88,6 @@ export async function DELETE(req: NextRequest) {
   `;
 
   const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
-  // Notify remaining queue users about their updated position
-  await sendNtfyToQueueUsers(
-    serverName,
-    `${dn} - Sıra Güncellendi`,
-    `${session.user.name} sıradan çıktı. Sıranız güncellendi.`
-  );
 
   return NextResponse.json({ success: true });
 }

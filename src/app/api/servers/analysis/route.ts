@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
-import { sendNtfyToAllWithTopic } from '@/lib/notify';
+import { sendNtfyByEvent } from '@/lib/notify';
+import type { NtfyEvent } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,10 +36,11 @@ export async function POST(req: NextRequest) {
 
   await sql`UPDATE server_analyses SET completed_at = NOW() WHERE id = ${active[0].id}`;
 
-  // Notify everyone that analysis is done and server is fully free
-  await sendNtfyToAllWithTopic(
-    `${dn} Tamamen Müsait! 🟢`,
-    `${session.user.name} analizi tamamladı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`
+  const analysisEvent: NtfyEvent = serverName === 'azure-1' ? 'azure-1_analysis' : 'azure-2_analysis';
+  await sendNtfyByEvent(
+    analysisEvent,
+    `${dn} Tamamen Musait!`,
+    `${session.user.name} analizi tamamladi. ${dn} artik tamamen bos, giris yapabilirsiniz!`
   );
 
   return NextResponse.json({ success: true });

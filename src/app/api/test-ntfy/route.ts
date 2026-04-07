@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
-import { sendNtfyToAllWithTopic } from '@/lib/notify';
+import { sendNtfyByEvent } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    console.log('Test ntfy endpoint called');
-    await sendNtfyToAllWithTopic(
+    const result = await sendNtfyByEvent(
+      'azure-2_exit',
       'Test - Vercel',
       'Bu bildirim Vercel uzerinden gonderildi!'
     );
-    console.log('Test ntfy completed');
-    return NextResponse.json({ success: true, message: 'Bildirimler gönderildi' });
+    return NextResponse.json({ success: true, result });
   } catch (e: any) {
-    console.error('Test ntfy error:', e);
     return NextResponse.json({ success: false, error: e.message }, { status: 500 });
   }
 }
