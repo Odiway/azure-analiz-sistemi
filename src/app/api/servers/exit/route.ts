@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
+import { sendNtfyToQueueUsers, sendNtfyToAllWithTopic } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
 
   const sql = getSQL();
   const userId = parseInt(session.user.id);
+  const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
 
   const activeSession = await sql`SELECT id FROM server_sessions WHERE server_name = ${serverName} AND user_id = ${userId} AND ended_at IS NULL LIMIT 1`;
 
@@ -32,6 +34,20 @@ export async function POST(req: NextRequest) {
   if (hasAnalysis && analysisMinutes) {
     const minutes = Math.max(parseInt(analysisMinutes) || 60, 1);
     await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
+
+    // Notify queue users: server available but analysis running
+    sendNtfyToQueueUsers(
+      serverName,
+      `${dn} Müsait (Analiz Var)`,
+      `${session.user.name} çıktı. ${dn} müsait ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
+    ).catch(() => {});
+  } else {
+    // Notify queue users: server fully available
+    sendNtfyToQueueUsers(
+      serverName,
+      `${dn} Müsait!`,
+      `${session.user.name} çıktı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`
+    ).catch(() => {});
   }
 
   return NextResponse.json({ success: true });

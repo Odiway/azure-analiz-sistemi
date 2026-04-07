@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
+import { sendNtfyToQueueUsers } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
 
   const sql = getSQL();
   const userId = parseInt(session.user.id);
+  const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
 
   const active = await sql`
     SELECT id FROM server_analyses 
@@ -32,6 +34,13 @@ export async function POST(req: NextRequest) {
   }
 
   await sql`UPDATE server_analyses SET completed_at = NOW() WHERE id = ${active[0].id}`;
+
+  // Notify queue users that analysis is done and server is fully free
+  sendNtfyToQueueUsers(
+    serverName,
+    `${dn} Tamamen Müsait!`,
+    `${session.user.name} analizi tamamladı. ${dn} artık tamamen boş!`
+  ).catch(() => {});
 
   return NextResponse.json({ success: true });
 }
