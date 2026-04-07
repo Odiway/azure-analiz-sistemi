@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
+import { sendNtfyToAllWithTopic } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,6 +48,15 @@ export async function POST(req: NextRequest) {
   `;
 
   await sql`INSERT INTO server_sessions (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
+
+  const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
+  // Notify everyone: someone entered the server
+  sendNtfyToAllWithTopic(
+    serverName,
+    `${dn} - Giriş Yapıldı`,
+    `${session.user.name} ${dn}'e giriş yaptı. Tahmini süre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`,
+    userId
+  ).catch(() => {});
 
   return NextResponse.json({ success: true });
 }

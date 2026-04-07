@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
-import { sendNtfyToQueueUsers, sendNtfyToAllWithTopic } from '@/lib/notify';
+import { sendNtfyToAllWithTopic } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,18 +35,20 @@ export async function POST(req: NextRequest) {
     const minutes = Math.max(parseInt(analysisMinutes) || 60, 1);
     await sql`INSERT INTO server_analyses (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
 
-    // Notify queue users: server available but analysis running
-    sendNtfyToQueueUsers(
+    // Notify everyone: user left but analysis running
+    sendNtfyToAllWithTopic(
       serverName,
-      `${dn} Müsait (Analiz Var)`,
-      `${session.user.name} çıktı. ${dn} müsait ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`
+      `${dn} - Çıkış (Analiz Var)`,
+      `${session.user.name} ${dn}'den çıktı ama analiz devam ediyor (~${minutes >= 60 ? Math.floor(minutes/60) + ' sa' : minutes + ' dk'}).`,
+      userId
     ).catch(() => {});
   } else {
-    // Notify queue users: server fully available
-    sendNtfyToQueueUsers(
+    // Notify everyone: server fully available
+    sendNtfyToAllWithTopic(
       serverName,
-      `${dn} Müsait!`,
-      `${session.user.name} çıktı. ${dn} artık tamamen boş, giriş yapabilirsiniz!`
+      `${dn} Müsait! 🟢`,
+      `${session.user.name} ${dn}'den çıktı. Sunucu artık tamamen boş, giriş yapabilirsiniz!`,
+      userId
     ).catch(() => {});
   }
 

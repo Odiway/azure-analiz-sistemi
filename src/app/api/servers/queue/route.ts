@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getSQL } from '@/lib/db';
+import { sendNtfyToUser, sendNtfyToQueueUsers } from '@/lib/notify';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,6 +40,22 @@ export async function POST(req: NextRequest) {
 
   await sql`INSERT INTO server_queue (server_name, user_id, position) VALUES (${serverName}, ${userId}, ${nextPos})`;
 
+  const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
+
+  // Notify the user currently in the server that someone is waiting
+  const currentUser = await sql`
+    SELECT user_id FROM server_sessions 
+    WHERE server_name = ${serverName} AND ended_at IS NULL 
+    LIMIT 1
+  `;
+  if (currentUser.length > 0) {
+    sendNtfyToUser(
+      currentUser[0].user_id,
+      `${dn} - Sırada Bekleyen Var`,
+      `${session.user.name} ${dn} için sıraya girdi (${nextPos}. sıra).`
+    ).catch(() => {});
+  }
+
   return NextResponse.json({ success: true, position: nextPos });
 }
 
@@ -68,6 +85,14 @@ export async function DELETE(req: NextRequest) {
     UPDATE server_queue SET position = ranked.new_pos
     FROM ranked WHERE server_queue.id = ranked.id
   `;
+
+  const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
+  // Notify remaining queue users about their updated position
+  sendNtfyToQueueUsers(
+    serverName,
+    `${dn} - Sıra Güncellendi`,
+    `${session.user.name} sıradan çıktı. Sıranız güncellendi.`
+  ).catch(() => {});
 
   return NextResponse.json({ success: true });
 }
