@@ -50,17 +50,10 @@ export async function POST(req: NextRequest) {
   await sql`INSERT INTO server_sessions (server_name, user_id, estimated_minutes) VALUES (${serverName}, ${userId}, ${minutes})`;
 
   const dn = serverName === 'azure-1' ? 'Azure 1' : 'Azure 2';
-  // Notify everyone: someone entered the server
-  let ntfyResult = 'not_sent';
-  try {
-    await sendNtfyToAllWithTopic(
-      `${dn} - Giri\u015f Yap\u0131ld\u0131`,
-      `${session.user.name} ${dn}'e giri\u015f yapt\u0131. Tahmini s\u00fcre: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
-    );
-    ntfyResult = 'sent_ok';
-  } catch (e: any) {
-    ntfyResult = 'error: ' + e.message;
-  }
+  const ntfyResult = await sendNtfyToAllWithTopic(
+    `${dn} - Giris Yapildi`,
+    `${session.user.name} ${dn} sunucusuna girdi. Tahmini sure: ${minutes >= 60 ? Math.floor(minutes/60) + ' saat' : minutes + ' dakika'}.`
+  );
 
   return NextResponse.json({ success: true, ntfy: ntfyResult });
 }

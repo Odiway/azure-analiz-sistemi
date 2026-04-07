@@ -44,6 +44,7 @@ export async function sendNtfyToUser(userId: number, title: string, message: str
 }
 
 export async function sendNtfyToAllWithTopic(title: string, message: string) {
+export async function sendNtfyToAllWithTopic(title: string, message: string): Promise<string> {
   try {
     const sql = getSQL();
     const users = await sql`
@@ -51,8 +52,9 @@ export async function sendNtfyToAllWithTopic(title: string, message: string) {
       WHERE ntfy_topic IS NOT NULL AND ntfy_topic != ''
     `;
 
-    console.log('Sending ntfy to', users.length, 'users');
+    if (users.length === 0) return 'no_users_with_topic';
 
+    const results: string[] = [];
     for (const row of users) {
       try {
         const res = await fetch(`https://ntfy.sh/${row.ntfy_topic}`, {
@@ -60,12 +62,14 @@ export async function sendNtfyToAllWithTopic(title: string, message: string) {
           body: message,
           headers: { 'Title': title, 'Tags': 'computer,loudspeaker' },
         });
-        console.log('Ntfy sent to', row.ntfy_topic, 'status:', res.status);
-      } catch (e) {
-        console.error('Ntfy send failed for topic:', row.ntfy_topic, e);
+        const body = await res.text();
+        results.push(`${row.ntfy_topic}:${res.status}`);
+      } catch (e: any) {
+        results.push(`${row.ntfy_topic}:ERR:${e.message}`);
       }
     }
-  } catch (e) {
-    console.error('sendNtfyToAllWithTopic error:', e);
+    return results.join(' | ');
+  } catch (e: any) {
+    return 'db_error: ' + e.message;
   }
 }
