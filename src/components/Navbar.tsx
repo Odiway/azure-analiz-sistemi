@@ -3,7 +3,7 @@
 import { signOut, useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Server, LogOut, User, StickyNote, Monitor, Settings } from 'lucide-react';
+import { Server, LogOut, User, Monitor, Settings } from 'lucide-react';
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -36,17 +36,6 @@ export default function Navbar() {
             >
               <Monitor className="w-4 h-4" />
               <span className="hidden sm:inline">Sunucular</span>
-            </Link>
-            <Link
-              href="/notes"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                pathname === '/notes'
-                  ? 'bg-amber-50 text-amber-700'
-                  : 'text-navy-500 hover:bg-gray-50 hover:text-navy-700'
-              }`}
-            >
-              <StickyNote className="w-4 h-4" />
-              <span className="hidden sm:inline">Notlar</span>
             </Link>
             <Link
               href="/settings"

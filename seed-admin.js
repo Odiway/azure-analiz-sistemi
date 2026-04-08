@@ -60,6 +60,7 @@ async function resetAndSeed() {
     user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
     content TEXT NOT NULL DEFAULT '',
     color VARCHAR(20) NOT NULL DEFAULT 'yellow',
+    expires_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
   )`;
 

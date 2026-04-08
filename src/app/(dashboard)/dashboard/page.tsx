@@ -5,7 +5,56 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   Monitor, LogIn, LogOut, Clock, User, Bell, Wifi, Shield,
   Users, ListOrdered, Timer, X, Activity, CheckCircle,
+  StickyNote, Pencil, Trash2, Save, Plus,
 } from 'lucide-react';
+
+interface Note {
+  id: number;
+  user_id: number;
+  user_name: string;
+  content: string;
+  color: string;
+  expires_at: string | null;
+  updated_at: string;
+}
+
+const noteColorMap: Record<string, { bg: string; border: string; header: string; text: string; shadow: string; dot: string }> = {
+  yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', header: 'bg-gradient-to-r from-yellow-200 to-amber-200', text: 'text-yellow-900', shadow: 'shadow-yellow-200/60', dot: 'bg-yellow-400' },
+  blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-gradient-to-r from-blue-200 to-sky-200', text: 'text-blue-900', shadow: 'shadow-blue-200/60', dot: 'bg-blue-400' },
+  green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-gradient-to-r from-green-200 to-emerald-200', text: 'text-green-900', shadow: 'shadow-green-200/60', dot: 'bg-green-400' },
+  pink: { bg: 'bg-pink-50', border: 'border-pink-300', header: 'bg-gradient-to-r from-pink-200 to-rose-200', text: 'text-pink-900', shadow: 'shadow-pink-200/60', dot: 'bg-pink-400' },
+  purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-gradient-to-r from-purple-200 to-violet-200', text: 'text-purple-900', shadow: 'shadow-purple-200/60', dot: 'bg-purple-400' },
+  orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-gradient-to-r from-orange-200 to-amber-200', text: 'text-orange-900', shadow: 'shadow-orange-200/60', dot: 'bg-orange-400' },
+};
+
+const noteColors = ['yellow', 'blue', 'green', 'pink', 'purple', 'orange'];
+
+const expiryOptions = [
+  { value: 15, label: '15 dk' },
+  { value: 30, label: '30 dk' },
+  { value: 60, label: '1 sa' },
+  { value: 120, label: '2 sa' },
+  { value: 240, label: '4 sa' },
+  { value: 480, label: '8 sa' },
+  { value: 1440, label: '24 sa' },
+  { value: 0, label: 'Süresiz' },
+];
+
+function timeAgo(dateStr: string): string {
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (diff < 60) return 'Az önce';
+  if (diff < 3600) return `${Math.floor(diff / 60)} dk önce`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} sa önce`;
+  return `${Math.floor(diff / 86400)} gün önce`;
+}
+
+function timeRemaining(expiresAt: string): string {
+  const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - Date.now()) / 1000));
+  if (remaining === 0) return 'Süresi doldu';
+  if (remaining < 60) return `${remaining} sn kaldı`;
+  if (remaining < 3600) return `${Math.floor(remaining / 60)} dk kaldı`;
+  return `${Math.floor(remaining / 3600)} sa ${Math.floor((remaining % 3600) / 60)} dk kaldı`;
+}
 
 interface SessionInfo {
   userName: string;
@@ -84,6 +133,14 @@ export default function DashboardPage() {
   const [showExitModal, setShowExitModal] = useState<string | null>(null);
   const [exitHasAnalysis, setExitHasAnalysis] = useState(false);
   const [exitAnalysisMinutes, setExitAnalysisMinutes] = useState(120);
+
+  // Notes state
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [noteContent, setNoteContent] = useState('');
+  const [noteColor, setNoteColor] = useState('yellow');
+  const [noteExpiry, setNoteExpiry] = useState(0);
+  const [noteSaving, setNoteSaving] = useState(false);
 
   const toast = useCallback((msg: string, type: 'success' | 'info' | 'warn' = 'info') => {
     const id = ++toastId.current;
@@ -218,6 +275,51 @@ export default function DashboardPage() {
 
   const myId = session?.user?.id ? parseInt(session.user.id) : null;
   const myActiveServer = Object.entries(servers).find(([, d]) => d.session && d.session.userId === myId)?.[0];
+  const myNote = notes.find((n) => n.user_id === myId);
+
+  // Notes fetch
+  const fetchNotes = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/notes?_=${Date.now()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+      if (res.ok) setNotes(await res.json());
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchNotes();
+    const i = setInterval(fetchNotes, 5000);
+    return () => clearInterval(i);
+  }, [fetchNotes]);
+
+  async function handleNoteSave() {
+    if (!noteContent.trim()) return;
+    setNoteSaving(true);
+    try {
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: noteContent.trim(), color: noteColor, expiryMinutes: noteExpiry || undefined }),
+      });
+      setNoteEditing(false);
+      await fetchNotes();
+    } catch {} finally { setNoteSaving(false); }
+  }
+
+  async function handleNoteDelete() {
+    setNoteSaving(true);
+    try {
+      await fetch('/api/notes', { method: 'DELETE' });
+      setNoteEditing(false);
+      await fetchNotes();
+    } catch {} finally { setNoteSaving(false); }
+  }
+
+  function startNoteEdit() {
+    setNoteContent(myNote?.content || '');
+    setNoteColor(myNote?.color || 'yellow');
+    setNoteExpiry(0);
+    setNoteEditing(true);
+  }
 
   if (loading) {
     return (
@@ -234,9 +336,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in py-4">
+    <div className="max-w-[1400px] mx-auto animate-fade-in py-4 px-4">
       {/* Header */}
-      <div className="text-center">
+      <div className="text-center mb-8">
         <h1 className="text-3xl font-extrabold text-navy-900 tracking-tight">
           Hoş geldin, <span className="text-azure-500">{session?.user?.name}</span>
         </h1>
@@ -249,8 +351,51 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Server Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* 3-column layout: Notes | Servers | Notes */}
+      <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_280px] lg:grid-cols-[240px_1fr_240px] gap-6">
+        {/* Left Notes Panel */}
+        <div className="hidden lg:block space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <StickyNote className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-bold text-navy-700">Panolar</span>
+            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
+          </div>
+          {notes.filter((_, i) => i % 2 === 0).map((note) => {
+            const c = noteColorMap[note.color] || noteColorMap.yellow;
+            const isMine = note.user_id === myId;
+            return (
+              <div key={note.id} className={`rounded-2xl ${c.bg} border ${c.border} shadow-lg ${c.shadow} transition-all hover:-translate-y-0.5 hover:shadow-xl ${isMine ? 'ring-2 ring-amber-400/50' : ''}`}>
+                <div className={`${c.header} rounded-t-2xl px-3 py-2 flex items-center justify-between`}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-white/50 rounded-lg flex items-center justify-center">
+                      <span className="text-[10px] font-black">{note.user_name.split(' ').map(w => w[0]).join('').slice(0, 2)}</span>
+                    </div>
+                    <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
+                  </div>
+                  {isMine && (
+                    <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                      <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                <div className="px-3 py-2">
+                  <p className={`text-xs leading-relaxed whitespace-pre-wrap ${c.text}`}>{note.content}</p>
+                </div>
+                <div className="px-3 pb-2 flex items-center justify-between">
+                  <p className="text-[9px] text-gray-400 font-medium">{timeAgo(note.updated_at)}</p>
+                  {note.expires_at && (
+                    <p className="text-[9px] text-orange-500 font-bold animate-pulse">⏱ {timeRemaining(note.expires_at)}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Center: Servers + Note Form + Mobile Notes */}
+        <div className="space-y-6">
+          {/* Server Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {(['azure-1', 'azure-2'] as const).map((sn) => {
           const d = servers[sn];
           const s = d.session;
@@ -510,6 +655,175 @@ export default function DashboardPage() {
             </div>
           );
         })}
+      </div>
+
+          {/* Note Add/Edit Form */}
+          <div className="bg-white rounded-3xl p-5 shadow-xl border border-amber-100">
+            {noteEditing ? (
+              <div className="space-y-3 animate-fade-in">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                  <StickyNote className="w-4 h-4 text-amber-500" />
+                  {myNote ? 'Notunu Düzenle' : 'Yeni Not'}
+                </h3>
+                <textarea
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                  placeholder="Ekibe mesajınızı yazın..."
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-gray-800 resize-none focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-sm"
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold text-gray-500">Renk:</span>
+                  {noteColors.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setNoteColor(c)}
+                      className={`w-6 h-6 rounded-full ${noteColorMap[c].dot} transition-all ${noteColor === c ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-110'}`}
+                    />
+                  ))}
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-gray-500 block mb-1.5">Süre:</span>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {expiryOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setNoteExpiry(opt.value)}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all ${noteExpiry === opt.value ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => setNoteEditing(false)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-xs transition-colors flex items-center gap-1">
+                    <X className="w-3 h-3" /> İptal
+                  </button>
+                  {myNote && (
+                    <button onClick={handleNoteDelete} disabled={noteSaving} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors disabled:opacity-50 flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" /> Sil
+                    </button>
+                  )}
+                  <button onClick={handleNoteSave} disabled={noteSaving || !noteContent.trim()} className="ml-auto px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1">
+                    <Save className="w-3 h-3" /> {noteSaving ? '...' : 'Kaydet'}
+                  </button>
+                </div>
+                <p className="text-right text-[9px] text-gray-400">{noteContent.length}/500</p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <StickyNote className="w-5 h-5 text-amber-500" />
+                  <span className="font-bold text-gray-800 text-sm">Yapışkan Notlar</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
+                </div>
+                <button
+                  onClick={startNoteEdit}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-amber-200/60 active:scale-[0.98]"
+                >
+                  {myNote ? <Pencil className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                  {myNote ? 'Düzenle' : 'Not Ekle'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Notes - show all notes in a grid on mobile/tablet */}
+          <div className="lg:hidden">
+            {notes.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {notes.map((note) => {
+                  const c = noteColorMap[note.color] || noteColorMap.yellow;
+                  const isMine = note.user_id === myId;
+                  return (
+                    <div key={note.id} className={`rounded-2xl ${c.bg} border ${c.border} shadow-lg ${c.shadow} transition-all hover:-translate-y-0.5 hover:shadow-xl ${isMine ? 'ring-2 ring-amber-400/50' : ''}`}>
+                      <div className={`${c.header} rounded-t-2xl px-3 py-2 flex items-center justify-between`}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 bg-white/50 rounded-lg flex items-center justify-center">
+                            <span className="text-[10px] font-black">{note.user_name.split(' ').map(w => w[0]).join('').slice(0, 2)}</span>
+                          </div>
+                          <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
+                        </div>
+                        {isMine && (
+                          <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                            <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="px-3 py-2">
+                        <p className={`text-xs leading-relaxed whitespace-pre-wrap ${c.text}`}>{note.content}</p>
+                      </div>
+                      <div className="px-3 pb-2 flex items-center justify-between">
+                        <p className="text-[9px] text-gray-400 font-medium">{timeAgo(note.updated_at)}</p>
+                        {note.expires_at && (
+                          <p className="text-[9px] text-orange-500 font-bold animate-pulse">⏱ {timeRemaining(note.expires_at)}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <StickyNote className="w-8 h-8 text-amber-200 mx-auto mb-2" />
+                <p className="text-gray-400 text-sm">Henüz not yok</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Notes Panel */}
+        <div className="hidden lg:block space-y-4">
+          <div className="flex items-center gap-2 mb-2">
+            <StickyNote className="w-4 h-4 text-amber-500" />
+            <span className="text-sm font-bold text-navy-700">Notlar</span>
+          </div>
+          {notes.filter((_, i) => i % 2 === 1).length === 0 && notes.length === 0 && (
+            <div className="text-center py-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200">
+              <StickyNote className="w-8 h-8 text-amber-200 mx-auto mb-2" />
+              <p className="text-gray-400 text-xs">Henüz not yok</p>
+              <p className="text-gray-300 text-[10px] mt-0.5">İlk notu siz bırakın!</p>
+            </div>
+          )}
+          {notes.filter((_, i) => i % 2 === 1).map((note) => {
+            const c = noteColorMap[note.color] || noteColorMap.yellow;
+            const isMine = note.user_id === myId;
+            return (
+              <div key={note.id} className={`rounded-2xl ${c.bg} border ${c.border} shadow-lg ${c.shadow} transition-all hover:-translate-y-0.5 hover:shadow-xl ${isMine ? 'ring-2 ring-amber-400/50' : ''}`}>
+                <div className={`${c.header} rounded-t-2xl px-3 py-2 flex items-center justify-between`}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-white/50 rounded-lg flex items-center justify-center">
+                      <span className="text-[10px] font-black">{note.user_name.split(' ').map(w => w[0]).join('').slice(0, 2)}</span>
+                    </div>
+                    <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
+                  </div>
+                  {isMine && (
+                    <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                      <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                    </button>
+                  )}
+                </div>
+                <div className="px-3 py-2">
+                  <p className={`text-xs leading-relaxed whitespace-pre-wrap ${c.text}`}>{note.content}</p>
+                </div>
+                <div className="px-3 pb-2 flex items-center justify-between">
+                  <p className="text-[9px] text-gray-400 font-medium">{timeAgo(note.updated_at)}</p>
+                  {note.expires_at && (
+                    <p className="text-[9px] text-orange-500 font-bold animate-pulse">⏱ {timeRemaining(note.expires_at)}</p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {/* Show single-note case on left panel only info */}
+          {notes.length === 1 && (
+            <div className="text-center py-6 rounded-2xl bg-gray-50 border border-dashed border-gray-200">
+              <p className="text-gray-300 text-[10px]">Daha fazla not eklenince burada görünür</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Enter Modal */}
