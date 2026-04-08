@@ -109,14 +109,14 @@ export default function SettingsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-8 animate-fade-in py-4">
       <div>
-        <h1 className="text-3xl font-extrabold text-navy-900 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-extrabold text-navy-900 dark:text-white tracking-tight flex items-center gap-3">
           <Settings className="w-8 h-8 text-azure-500" />
           Ayarlar
         </h1>
-        <p className="text-navy-400 text-sm mt-1">Bildirim tercihlerinizi yonetin</p>
+        <p className="text-navy-400 dark:text-navy-300 text-sm mt-1">Bildirim tercihlerinizi yonetin</p>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white dark:bg-navy-900 rounded-3xl shadow-xl border border-gray-100 dark:border-navy-800 overflow-hidden transition-colors duration-300">
         <div className="bg-gradient-to-r from-azure-500 to-blue-600 px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
@@ -131,8 +131,8 @@ export default function SettingsPage() {
 
         <div className="p-6 space-y-6">
           {/* Setup Steps */}
-          <div className="bg-azure-50 rounded-2xl p-4 border border-azure-100">
-            <h3 className="font-bold text-azure-800 text-sm mb-3">Nasil Kurulur?</h3>
+          <div className="bg-azure-50 dark:bg-azure-500/10 rounded-2xl p-4 border border-azure-100 dark:border-azure-500/20">
+            <h3 className="font-bold text-azure-800 dark:text-azure-300 text-sm mb-3">Nasil Kurulur?</h3>
             <div className="space-y-2.5">
               <div className="flex items-start gap-3">
                 <span className="w-6 h-6 bg-azure-200 rounded-full flex items-center justify-center text-xs font-bold text-azure-700 flex-shrink-0 mt-0.5">1</span>
@@ -166,7 +166,7 @@ export default function SettingsPage() {
 
           {/* Topic Input */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
               <Bell className="w-4 h-4 inline mr-1.5 text-azure-500" />
               Ntfy Topic Adi
             </label>
@@ -177,7 +177,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNtfyTopic(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
                 maxLength={100}
                 placeholder={suggestedTopic || 'azure-temsa-adiniz'}
-                className="w-full px-4 py-3 border border-gray-200 rounded-2xl text-gray-800 font-mono text-sm focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400 pr-10"
+                className="w-full px-4 py-3 border border-gray-200 dark:border-navy-700 rounded-2xl text-gray-800 dark:text-gray-200 dark:bg-navy-800 font-mono text-sm focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400 pr-10"
               />
               {ntfyTopic && (
                 <button onClick={copyTopic} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-azure-500 transition-colors">
@@ -195,7 +195,7 @@ export default function SettingsPage() {
           {/* Notification Preferences Checkboxes */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <label className="text-sm font-bold text-gray-700">
+              <label className="text-sm font-bold text-gray-700 dark:text-gray-300">
                 Hangi olaylarda bildirim gelsin?
               </label>
               <button
@@ -208,16 +208,16 @@ export default function SettingsPage() {
 
             <div className="space-y-3">
               {Object.entries(groups).map(([group, events]) => (
-                <div key={group} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2.5">{group}</h4>
+                <div key={group} className="bg-gray-50 dark:bg-navy-800/50 rounded-2xl p-4 border border-gray-100 dark:border-navy-700">
+                  <h4 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">{group}</h4>
                   <div className="space-y-2">
                     {events.map((event) => (
                       <label
                         key={event.key}
                         className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all ${
                           prefs[event.key]
-                            ? 'bg-azure-50 border border-azure-200'
-                            : 'bg-white border border-gray-100 hover:border-gray-200'
+                            ? 'bg-azure-50 dark:bg-azure-500/10 border border-azure-200 dark:border-azure-500/20'
+                            : 'bg-white dark:bg-navy-900 border border-gray-100 dark:border-navy-700 hover:border-gray-200 dark:hover:border-navy-600'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
@@ -227,7 +227,7 @@ export default function SettingsPage() {
                         }`}>
                           {prefs[event.key] && <Check className="w-3.5 h-3.5 text-white" />}
                         </div>
-                        <span className={`text-sm ${prefs[event.key] ? 'text-azure-800 font-medium' : 'text-gray-600'}`}>
+                        <span className={`text-sm ${prefs[event.key] ? 'text-azure-800 dark:text-azure-300 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
                           {event.label}
                         </span>
                         <input
@@ -269,8 +269,8 @@ export default function SettingsPage() {
                 disabled={testSent}
                 className={`px-5 py-3 rounded-2xl font-bold text-sm transition-all flex items-center gap-2 active:scale-[0.98] ${
                   testSent
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200'
+                    ? 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-500/30'
+                    : 'bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-navy-700'
                 }`}
               >
                 <Bell className="w-4 h-4" />

@@ -19,12 +19,12 @@ interface Note {
 }
 
 const noteColorMap: Record<string, { bg: string; border: string; header: string; text: string; shadow: string; dot: string }> = {
-  yellow: { bg: 'bg-yellow-50', border: 'border-yellow-300', header: 'bg-gradient-to-r from-yellow-200 to-amber-200', text: 'text-yellow-900', shadow: 'shadow-yellow-200/60', dot: 'bg-yellow-400' },
-  blue: { bg: 'bg-blue-50', border: 'border-blue-300', header: 'bg-gradient-to-r from-blue-200 to-sky-200', text: 'text-blue-900', shadow: 'shadow-blue-200/60', dot: 'bg-blue-400' },
-  green: { bg: 'bg-green-50', border: 'border-green-300', header: 'bg-gradient-to-r from-green-200 to-emerald-200', text: 'text-green-900', shadow: 'shadow-green-200/60', dot: 'bg-green-400' },
-  pink: { bg: 'bg-pink-50', border: 'border-pink-300', header: 'bg-gradient-to-r from-pink-200 to-rose-200', text: 'text-pink-900', shadow: 'shadow-pink-200/60', dot: 'bg-pink-400' },
-  purple: { bg: 'bg-purple-50', border: 'border-purple-300', header: 'bg-gradient-to-r from-purple-200 to-violet-200', text: 'text-purple-900', shadow: 'shadow-purple-200/60', dot: 'bg-purple-400' },
-  orange: { bg: 'bg-orange-50', border: 'border-orange-300', header: 'bg-gradient-to-r from-orange-200 to-amber-200', text: 'text-orange-900', shadow: 'shadow-orange-200/60', dot: 'bg-orange-400' },
+  yellow: { bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-300 dark:border-yellow-700', header: 'bg-gradient-to-r from-yellow-200 to-amber-200 dark:from-yellow-800/60 dark:to-amber-800/60', text: 'text-yellow-900 dark:text-yellow-200', shadow: 'shadow-yellow-200/60 dark:shadow-yellow-900/20', dot: 'bg-yellow-400' },
+  blue: { bg: 'bg-blue-50 dark:bg-blue-900/20', border: 'border-blue-300 dark:border-blue-700', header: 'bg-gradient-to-r from-blue-200 to-sky-200 dark:from-blue-800/60 dark:to-sky-800/60', text: 'text-blue-900 dark:text-blue-200', shadow: 'shadow-blue-200/60 dark:shadow-blue-900/20', dot: 'bg-blue-400' },
+  green: { bg: 'bg-green-50 dark:bg-green-900/20', border: 'border-green-300 dark:border-green-700', header: 'bg-gradient-to-r from-green-200 to-emerald-200 dark:from-green-800/60 dark:to-emerald-800/60', text: 'text-green-900 dark:text-green-200', shadow: 'shadow-green-200/60 dark:shadow-green-900/20', dot: 'bg-green-400' },
+  pink: { bg: 'bg-pink-50 dark:bg-pink-900/20', border: 'border-pink-300 dark:border-pink-700', header: 'bg-gradient-to-r from-pink-200 to-rose-200 dark:from-pink-800/60 dark:to-rose-800/60', text: 'text-pink-900 dark:text-pink-200', shadow: 'shadow-pink-200/60 dark:shadow-pink-900/20', dot: 'bg-pink-400' },
+  purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', border: 'border-purple-300 dark:border-purple-700', header: 'bg-gradient-to-r from-purple-200 to-violet-200 dark:from-purple-800/60 dark:to-violet-800/60', text: 'text-purple-900 dark:text-purple-200', shadow: 'shadow-purple-200/60 dark:shadow-purple-900/20', dot: 'bg-purple-400' },
+  orange: { bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-300 dark:border-orange-700', header: 'bg-gradient-to-r from-orange-200 to-amber-200 dark:from-orange-800/60 dark:to-amber-800/60', text: 'text-orange-900 dark:text-orange-200', shadow: 'shadow-orange-200/60 dark:shadow-orange-900/20', dot: 'bg-orange-400' },
 };
 
 const noteColors = ['yellow', 'blue', 'green', 'pink', 'purple', 'orange'];
@@ -380,7 +380,7 @@ export default function DashboardPage() {
             <div className="absolute inset-0 border-4 border-azure-200 rounded-full" />
             <div className="absolute inset-0 border-4 border-azure-500 border-t-transparent rounded-full animate-spin" />
           </div>
-          <p className="text-navy-400 text-sm font-medium">Yükleniyor...</p>
+          <p className="text-navy-400 dark:text-navy-300 text-sm font-medium">Yükleniyor...</p>
         </div>
       </div>
     );
@@ -390,15 +390,15 @@ export default function DashboardPage() {
     <div className="max-w-[1400px] mx-auto animate-fade-in py-4 px-4">
       {/* Header */}
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-extrabold text-navy-900 tracking-tight">
-          Hoş geldin, <span className="text-azure-500">{session?.user?.name}</span>
+        <h1 className="text-3xl font-extrabold text-navy-900 dark:text-white tracking-tight">
+          Hoş geldin, <span className="text-azure-500 dark:text-azure-400">{session?.user?.name}</span>
         </h1>
         <div className="flex items-center justify-center gap-2 mt-3">
-          <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400 rounded-full text-xs font-semibold">
             <Wifi className="w-3 h-3" />
             Canlı
           </div>
-          <span className="text-navy-300 text-xs">Her 2 saniyede güncellenir</span>
+          <span className="text-navy-300 dark:text-navy-500 text-xs">Her 2 saniyede güncellenir</span>
         </div>
       </div>
 
@@ -408,8 +408,8 @@ export default function DashboardPage() {
         <div className="hidden lg:block space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <StickyNote className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-bold text-navy-700">Panolar</span>
-            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
+            <span className="text-sm font-bold text-navy-700 dark:text-navy-200">Panolar</span>
+            <span className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
           </div>
           {notes.filter((_, i) => i % 2 === 0).map((note) => {
             const c = noteColorMap[note.color] || noteColorMap.yellow;
@@ -476,35 +476,35 @@ export default function DashboardPage() {
 
           if (occupied) {
             if (isMe) {
-              ringClass = 'ring-2 ring-azure-400 shadow-2xl shadow-azure-100';
+              ringClass = 'ring-2 ring-azure-400 shadow-2xl shadow-azure-100 dark:shadow-azure-900/30';
               barClass = 'bg-gradient-to-r from-azure-400 to-blue-600';
               statusLabel = 'İçeridesiniz';
-              statusColor = 'bg-azure-100 text-azure-700';
+              statusColor = 'bg-azure-100 dark:bg-azure-500/20 text-azure-700 dark:text-azure-400';
               dotColor = 'bg-azure-500';
             } else if (overtime) {
-              ringClass = 'ring-2 ring-orange-400 shadow-2xl shadow-orange-100';
+              ringClass = 'ring-2 ring-orange-400 shadow-2xl shadow-orange-100 dark:shadow-orange-900/30';
               barClass = 'bg-gradient-to-r from-orange-400 to-amber-500';
               statusLabel = 'Süre Aşımı';
-              statusColor = 'bg-orange-100 text-orange-700';
+              statusColor = 'bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-400';
               dotColor = 'bg-orange-500';
             } else {
-              ringClass = 'ring-2 ring-red-400 shadow-2xl shadow-red-100';
+              ringClass = 'ring-2 ring-red-400 shadow-2xl shadow-red-100 dark:shadow-red-900/30';
               barClass = 'bg-gradient-to-r from-red-400 to-rose-600';
               statusLabel = 'Meşgul';
-              statusColor = 'bg-red-100 text-red-700';
+              statusColor = 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400';
               dotColor = 'bg-red-500';
             }
           } else if (a) {
-            ringClass = 'ring-2 ring-purple-300 shadow-xl shadow-purple-50';
+            ringClass = 'ring-2 ring-purple-300 shadow-xl shadow-purple-50 dark:shadow-purple-900/20';
             barClass = 'bg-gradient-to-r from-purple-400 to-violet-500';
             statusLabel = 'Analiz Devam Ediyor';
-            statusColor = 'bg-purple-100 text-purple-700';
+            statusColor = 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400';
             dotColor = 'bg-purple-500';
           } else {
-            ringClass = 'ring-1 ring-green-300 shadow-xl shadow-green-50 hover:shadow-2xl';
+            ringClass = 'ring-1 ring-green-300 shadow-xl shadow-green-50 dark:shadow-green-900/20 hover:shadow-2xl';
             barClass = 'bg-gradient-to-r from-emerald-400 to-teal-500';
             statusLabel = 'Müsait';
-            statusColor = 'bg-green-100 text-green-700';
+            statusColor = 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400';
             dotColor = 'bg-green-500';
           }
 
@@ -512,7 +512,7 @@ export default function DashboardPage() {
             <div key={sn} className={`relative overflow-hidden rounded-3xl transition-all duration-500 ${ringClass}`}>
               <div className={`h-1.5 ${barClass}`} />
 
-              <div className="bg-white p-6">
+              <div className="bg-white dark:bg-navy-900 p-6 transition-colors duration-300">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3">
@@ -526,22 +526,22 @@ export default function DashboardPage() {
                       } animate-pulse`} />}
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">{dn}</h2>
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white">{dn}</h2>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2 py-0.5 rounded-full ${statusColor}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
                         {statusLabel}
                       </span>
                     </div>
                   </div>
-                  <span className="text-4xl font-black text-gray-100 select-none">{num}</span>
+                  <span className="text-4xl font-black text-gray-100 dark:text-navy-800 select-none">{num}</span>
                 </div>
 
                 {/* Body */}
                 {occupied ? (
                   <div className="space-y-3">
-                    <div className={`rounded-2xl p-3.5 ${isMe ? 'bg-azure-50 border border-azure-100' : 'bg-red-50 border border-red-100'}`}>
+                    <div className={`rounded-2xl p-3.5 ${isMe ? 'bg-azure-50 dark:bg-azure-500/10 border border-azure-100 dark:border-azure-500/20' : 'bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20'}`}>
                       <div className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isMe ? 'bg-azure-200' : 'bg-red-200'}`}>
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isMe ? 'bg-azure-200 dark:bg-azure-500/30' : 'bg-red-200 dark:bg-red-500/30'}`}>
                           <User className={`w-4 h-4 ${isMe ? 'text-azure-700' : 'text-red-700'}`} />
                         </div>
                         <div>
@@ -554,7 +554,7 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <div className={`rounded-2xl p-3 text-center ${isMe ? 'bg-azure-50 border border-azure-100' : overtime ? 'bg-orange-50 border border-orange-100' : 'bg-red-50 border border-red-100'}`}>
+                      <div className={`rounded-2xl p-3 text-center ${isMe ? 'bg-azure-50 dark:bg-azure-500/10 border border-azure-100 dark:border-azure-500/20' : overtime ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-100 dark:border-orange-500/20' : 'bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20'}`}>
                         <div className="flex items-center justify-center gap-1 mb-0.5">
                           <Clock className={`w-3 h-3 ${isMe ? 'text-azure-400' : 'text-red-400'}`} />
                           <span className={`text-[10px] font-medium ${isMe ? 'text-azure-500' : 'text-red-500'}`}>Geçen Süre</span>
@@ -563,7 +563,7 @@ export default function DashboardPage() {
                           {formatDuration(s!.startedAt)}
                         </p>
                       </div>
-                      <div className={`rounded-2xl p-3 text-center ${overtime ? 'bg-orange-50 border border-orange-200' : 'bg-gray-50 border border-gray-100'}`}>
+                      <div className={`rounded-2xl p-3 text-center ${overtime ? 'bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/20' : 'bg-gray-50 dark:bg-navy-800 border border-gray-100 dark:border-navy-700'}`}>
                         <div className="flex items-center justify-center gap-1 mb-0.5">
                           <Timer className={`w-3 h-3 ${overtime ? 'text-orange-500' : 'text-gray-400'}`} />
                           <span className={`text-[10px] font-medium ${overtime ? 'text-orange-600' : 'text-gray-500'}`}>Tahmini</span>
@@ -588,7 +588,7 @@ export default function DashboardPage() {
                       </button>
                     ) : (
                       <div className="space-y-2">
-                        <div className="rounded-2xl bg-red-50 border border-red-200 py-2.5 text-center">
+                        <div className="rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 py-2.5 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <Shield className="w-4 h-4 text-red-400" />
                             <span className="text-red-600 font-semibold text-sm">
@@ -610,7 +610,7 @@ export default function DashboardPage() {
                           <button
                             onClick={() => handleLeaveQueue(sn)}
                             disabled={actionLoading === `q-${sn}`}
-                            className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-2xl font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             <X className="w-4 h-4" />
                             Sıradan Çık ({myQueuePos.position}. sıradasınız)
@@ -640,15 +640,15 @@ export default function DashboardPage() {
                 ) : (
                   <div className="space-y-3">
                     {a ? (
-                      <div className={`rounded-2xl p-4 text-center ${analysisOvertime ? 'bg-purple-50 border-2 border-purple-300' : 'bg-purple-50 border border-purple-100'}`}>
-                        <div className="w-11 h-11 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                      <div className={`rounded-2xl p-4 text-center ${analysisOvertime ? 'bg-purple-50 dark:bg-purple-500/10 border-2 border-purple-300 dark:border-purple-500/30' : 'bg-purple-50 dark:bg-purple-500/10 border border-purple-100 dark:border-purple-500/20'}`}>
+                        <div className="w-11 h-11 bg-purple-100 dark:bg-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-2">
                           <Activity className={`w-5 h-5 text-purple-600 ${analysisOvertime ? '' : 'animate-pulse'}`} />
                         </div>
-                        <p className="text-purple-800 font-semibold">Müsait — Analiz Devam Ediyor</p>
+                        <p className="text-purple-800 dark:text-purple-300 font-semibold">Müsait — Analiz Devam Ediyor</p>
                         <p className="text-purple-500 text-xs mt-0.5">
                           {a.userName} tarafından başlatıldı
                         </p>
-                        <div className="mt-2 inline-flex items-center gap-2 bg-purple-100 px-3 py-1.5 rounded-xl">
+                        <div className="mt-2 inline-flex items-center gap-2 bg-purple-100 dark:bg-purple-500/20 px-3 py-1.5 rounded-xl">
                           <Timer className="w-3.5 h-3.5 text-purple-600" />
                           <span className={`text-sm font-bold ${analysisOvertime ? 'text-orange-600' : 'text-purple-700'}`}>
                             {formatETA(a.startedAt, a.estimatedMinutes)}
@@ -666,12 +666,12 @@ export default function DashboardPage() {
                         )}
                       </div>
                     ) : (
-                      <div className="rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-100 p-5 text-center">
-                        <div className="w-11 h-11 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-2">
-                          <Monitor className="w-5 h-5 text-green-600" />
+                      <div className="rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-500/10 dark:to-emerald-500/10 border border-green-100 dark:border-green-500/20 p-5 text-center">
+                        <div className="w-11 h-11 bg-green-100 dark:bg-green-500/20 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                          <Monitor className="w-5 h-5 text-green-600 dark:text-green-400" />
                         </div>
-                        <p className="text-green-800 font-semibold">Sunucu Müsait</p>
-                        <p className="text-green-500 text-xs mt-0.5">Kimse bu sunucuyu kullanmıyor</p>
+                        <p className="text-green-800 dark:text-green-300 font-semibold">Sunucu Müsait</p>
+                        <p className="text-green-500 dark:text-green-400 text-xs mt-0.5">Kimse bu sunucuyu kullanmıyor</p>
                       </div>
                     )}
 
@@ -680,7 +680,7 @@ export default function DashboardPage() {
                       disabled={!!imInOther}
                       className={`w-full py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
                         imInOther
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200'
+                          ? 'bg-gray-100 dark:bg-navy-800 text-gray-400 dark:text-navy-500 cursor-not-allowed border border-gray-200 dark:border-navy-700'
                           : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-lg shadow-green-200/60 disabled:opacity-50'
                       }`}
                     >
@@ -714,10 +714,10 @@ export default function DashboardPage() {
       </div>
 
           {/* Note Add/Edit Form */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-5 shadow-xl border border-amber-100">
+          <div className="bg-white/90 dark:bg-navy-900/90 backdrop-blur-sm rounded-3xl p-5 shadow-xl border border-amber-100 dark:border-amber-500/20 transition-colors duration-300">
             {noteEditing ? (
               <div className="space-y-3 animate-fade-in">
-                <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <StickyNote className="w-4 h-4 text-amber-500" />
                   {editingNoteId ? 'Notu Düzenle' : 'Yeni Not'}
                 </h3>
@@ -727,10 +727,10 @@ export default function DashboardPage() {
                   maxLength={500}
                   rows={3}
                   placeholder="Ekibe mesajınızı yazın..."
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-gray-800 resize-none focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-sm"
+                  className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-2xl text-gray-800 dark:text-gray-200 dark:bg-navy-800 resize-none focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 text-sm"
                 />
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold text-gray-500">Renk:</span>
+                  <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">Renk:</span>
                   {noteColors.map((c) => (
                     <button
                       key={c}
@@ -740,13 +740,13 @@ export default function DashboardPage() {
                   ))}
                 </div>
                 <div>
-                  <span className="text-[10px] font-semibold text-gray-500 block mb-1.5">Süre:</span>
+                  <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 block mb-1.5">Süre:</span>
                   <div className="grid grid-cols-4 gap-1.5">
                     {expiryOptions.map((opt) => (
                       <button
                         key={opt.value}
                         onClick={() => setNoteExpiry(opt.value)}
-                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all ${noteExpiry === opt.value ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all ${noteExpiry === opt.value ? 'bg-amber-500 text-white shadow-md' : 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-navy-700'}`}
                       >
                         {opt.label}
                       </button>
@@ -754,7 +754,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setNoteEditing(false); setEditingNoteId(null); }} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-xs transition-colors flex items-center gap-1">
+                  <button onClick={() => { setNoteEditing(false); setEditingNoteId(null); }} className="px-3 py-2 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-xs transition-colors flex items-center gap-1">
                     <X className="w-3 h-3" /> İptal
                   </button>
                   {editingNoteId && (
@@ -772,8 +772,8 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <StickyNote className="w-5 h-5 text-amber-500" />
-                  <span className="font-bold text-gray-800 text-sm">Yapışkan Notlar</span>
-                  <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
+                  <span className="font-bold text-gray-800 dark:text-white text-sm">Yapışkan Notlar</span>
+                  <span className="text-[10px] bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
                 </div>
                 <button
                   onClick={startNewNote}
@@ -828,8 +828,8 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <StickyNote className="w-8 h-8 text-amber-200 mx-auto mb-2" />
-                <p className="text-gray-400 text-sm">Henüz not yok</p>
+                <StickyNote className="w-8 h-8 text-amber-200 dark:text-amber-600 mx-auto mb-2" />
+                <p className="text-gray-400 dark:text-navy-400 text-sm">Henüz not yok</p>
               </div>
             )}
           </div>
@@ -839,13 +839,13 @@ export default function DashboardPage() {
         <div className="hidden lg:block space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <StickyNote className="w-4 h-4 text-amber-500" />
-            <span className="text-sm font-bold text-navy-700">Notlar</span>
+            <span className="text-sm font-bold text-navy-700 dark:text-navy-200">Notlar</span>
           </div>
           {notes.filter((_, i) => i % 2 === 1).length === 0 && notes.length === 0 && (
-            <div className="text-center py-8 rounded-2xl bg-gray-50 border border-dashed border-gray-200">
-              <StickyNote className="w-8 h-8 text-amber-200 mx-auto mb-2" />
-              <p className="text-gray-400 text-xs">Henüz not yok</p>
-              <p className="text-gray-300 text-[10px] mt-0.5">İlk notu siz bırakın!</p>
+            <div className="text-center py-8 rounded-2xl bg-gray-50 dark:bg-navy-800/50 border border-dashed border-gray-200 dark:border-navy-700">
+              <StickyNote className="w-8 h-8 text-amber-200 dark:text-amber-600 mx-auto mb-2" />
+              <p className="text-gray-400 dark:text-navy-400 text-xs">Henüz not yok</p>
+              <p className="text-gray-300 dark:text-navy-500 text-[10px] mt-0.5">İlk notu siz bırakın!</p>
             </div>
           )}
           {notes.filter((_, i) => i % 2 === 1).map((note) => {
@@ -885,8 +885,8 @@ export default function DashboardPage() {
           })}
           {/* Show single-note case on left panel only info */}
           {notes.length === 1 && (
-            <div className="text-center py-6 rounded-2xl bg-gray-50 border border-dashed border-gray-200">
-              <p className="text-gray-300 text-[10px]">Daha fazla not eklenince burada görünür</p>
+            <div className="text-center py-6 rounded-2xl bg-gray-50 dark:bg-navy-800/50 border border-dashed border-gray-200 dark:border-navy-700">
+              <p className="text-gray-300 dark:text-navy-500 text-[10px]">Daha fazla not eklenince burada görünür</p>
             </div>
           )}
         </div>
@@ -895,11 +895,11 @@ export default function DashboardPage() {
       {/* Enter Modal */}
       {showEnterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm mx-4 shadow-2xl animate-scale-in">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">
+          <div className="bg-white dark:bg-navy-900 rounded-3xl p-6 w-full max-w-sm mx-4 shadow-2xl animate-scale-in">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
               {showEnterModal === 'azure-1' ? 'Azure 1' : 'Azure 2'} — Giriş
             </h3>
-            <p className="text-sm text-gray-500 mb-5">Tahmini ne kadar süre kullanacaksınız?</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Tahmini ne kadar süre kullanacaksınız?</p>
 
             <div className="space-y-3 mb-5">
               <div className="grid grid-cols-4 gap-2">
@@ -909,8 +909,8 @@ export default function DashboardPage() {
                     onClick={() => setEnterMinutes(m)}
                     className={`py-2 rounded-xl text-sm font-bold transition-all ${
                       enterMinutes === m
-                        ? 'bg-azure-500 text-white shadow-md shadow-azure-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-azure-500 text-white shadow-md shadow-azure-200 dark:shadow-azure-900'
+                        : 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-navy-700'
                     }`}
                   >
                     {m >= 60 ? `${m / 60} sa` : `${m} dk`}
@@ -924,8 +924,8 @@ export default function DashboardPage() {
                     onClick={() => setEnterMinutes(m)}
                     className={`py-2 rounded-xl text-sm font-bold transition-all ${
                       enterMinutes === m
-                        ? 'bg-azure-500 text-white shadow-md shadow-azure-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'bg-azure-500 text-white shadow-md shadow-azure-200 dark:shadow-azure-900'
+                        : 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-navy-700'
                     }`}
                   >
                     {`${m / 60} sa`}
@@ -938,16 +938,16 @@ export default function DashboardPage() {
                   min={1}
                   value={enterMinutes}
                   onChange={(e) => setEnterMinutes(parseInt(e.target.value) || 60)}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-center font-bold text-gray-800 focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400"
+                  className="flex-1 px-3 py-2 border border-gray-200 dark:border-navy-700 rounded-xl text-center font-bold text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400"
                 />
-                <span className="text-sm text-gray-500 font-medium">dakika</span>
+                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">dakika</span>
               </div>
             </div>
 
             <div className="flex gap-2">
               <button
                 onClick={() => setShowEnterModal(null)}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors"
               >
                 İptal
               </button>
@@ -967,19 +967,19 @@ export default function DashboardPage() {
       {/* Exit Modal */}
       {showExitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm mx-4 shadow-2xl animate-scale-in">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">
+          <div className="bg-white dark:bg-navy-900 rounded-3xl p-6 w-full max-w-sm mx-4 shadow-2xl animate-scale-in">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
               {showExitModal === 'azure-1' ? 'Azure 1' : 'Azure 2'} — Çıkış
             </h3>
-            <p className="text-sm text-gray-500 mb-5">Sunucudan çıkıyorsunuz</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">Sunucudan çıkıyorsunuz</p>
 
             <div className="mb-5">
               <button
                 onClick={() => setExitHasAnalysis(!exitHasAnalysis)}
                 className={`w-full flex items-center gap-3 p-3.5 rounded-2xl border-2 transition-all ${
                   exitHasAnalysis
-                    ? 'border-purple-400 bg-purple-50'
-                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                    ? 'border-purple-400 dark:border-purple-500/40 bg-purple-50 dark:bg-purple-500/10'
+                    : 'border-gray-200 dark:border-navy-700 bg-gray-50 dark:bg-navy-800 hover:border-gray-300 dark:hover:border-navy-600'
                 }`}
               >
                 <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -988,10 +988,10 @@ export default function DashboardPage() {
                   {exitHasAnalysis && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                 </div>
                 <div className="text-left">
-                  <p className={`font-bold text-sm ${exitHasAnalysis ? 'text-purple-900' : 'text-gray-700'}`}>
+                  <p className={`font-bold text-sm ${exitHasAnalysis ? 'text-purple-900 dark:text-purple-300' : 'text-gray-700 dark:text-gray-300'}`}>
                     İçeride analizim var
                   </p>
-                  <p className={`text-xs ${exitHasAnalysis ? 'text-purple-500' : 'text-gray-400'}`}>
+                  <p className={`text-xs ${exitHasAnalysis ? 'text-purple-500 dark:text-purple-400' : 'text-gray-400'}`}>
                     Çıkıyorum ama analiz devam ediyor
                   </p>
                 </div>
@@ -1001,7 +1001,7 @@ export default function DashboardPage() {
 
             {exitHasAnalysis && (
               <div className="mb-5 animate-fade-in">
-                <p className="text-sm font-semibold text-purple-800 mb-3">Analiz tahmini ne kadar sürecek?</p>
+                <p className="text-sm font-semibold text-purple-800 dark:text-purple-300 mb-3">Analiz tahmini ne kadar sürecek?</p>
                 <div className="grid grid-cols-4 gap-2 mb-3">
                   {[60, 120, 240, 480].map((m) => (
                     <button
@@ -1038,9 +1038,9 @@ export default function DashboardPage() {
                     min={1}
                     value={exitAnalysisMinutes}
                     onChange={(e) => setExitAnalysisMinutes(parseInt(e.target.value) || 120)}
-                    className="flex-1 px-3 py-2 border border-purple-200 rounded-xl text-center font-bold text-purple-800 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400"
+                    className="flex-1 px-3 py-2 border border-purple-200 dark:border-purple-500/30 rounded-xl text-center font-bold text-purple-800 dark:text-purple-300 dark:bg-navy-800 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400"
                   />
-                  <span className="text-sm text-purple-500 font-medium">dakika</span>
+                  <span className="text-sm text-purple-500 dark:text-purple-400 font-medium">dakika</span>
                 </div>
               </div>
             )}
@@ -1048,7 +1048,7 @@ export default function DashboardPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowExitModal(null)}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                className="flex-1 py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold transition-colors"
               >
                 İptal
               </button>
@@ -1073,7 +1073,7 @@ export default function DashboardPage() {
             className={`pointer-events-auto px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-up min-w-[260px] border ${
               t.type === 'success' ? 'bg-emerald-500 text-white border-emerald-400'
                 : t.type === 'warn' ? 'bg-red-500 text-white border-red-400'
-                : 'bg-white text-navy-800 border-navy-100'
+                : 'bg-white dark:bg-navy-800 text-navy-800 dark:text-white border-navy-100 dark:border-navy-700'
             }`}
           >
             <Bell className={`w-4 h-4 flex-shrink-0 ${t.type === 'success' || t.type === 'warn' ? 'text-white' : 'text-azure-500'}`} />

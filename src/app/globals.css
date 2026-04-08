@@ -29,6 +29,11 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+:is(.dark) .glass {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 .glass-dark {
   background: rgba(15, 23, 42, 0.75);
   backdrop-filter: blur(20px) saturate(180%);
@@ -45,10 +50,21 @@ body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+:is(.dark) .glass-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.2);
+}
+
 .glass-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 12px 28px rgba(0,0,0,0.06);
   border-color: rgba(0, 120, 212, 0.15);
   transform: translateY(-1px);
+}
+
+:is(.dark) .glass-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 12px 28px rgba(0,0,0,0.25);
+  border-color: rgba(0, 120, 212, 0.3);
 }
 
 /* Mesh gradient backgrounds */
@@ -145,6 +161,10 @@ textarea:focus {
   background-size: 24px 24px;
 }
 
+:is(.dark) .dot-pattern {
+  background-image: radial-gradient(circle, rgba(0, 120, 212, 0.15) 1px, transparent 1px);
+}
+
 /* Animated blob */
 @keyframes blob {
   0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
@@ -227,6 +247,36 @@ textarea:focus {
   z-index: 0;
   animation: scanline 6s linear infinite;
   opacity: 0.4;
+}
+
+:is(.dark) .tech-bg {
+  background:
+    linear-gradient(90deg, rgba(0, 120, 212, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(0, 120, 212, 0.06) 1px, transparent 1px),
+    radial-gradient(ellipse 600px 400px at 10% 20%, rgba(0, 120, 212, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 500px at 85% 15%, rgba(99, 102, 241, 0.1) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 300px at 50% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 300px 300px at 90% 70%, rgba(245, 158, 11, 0.06) 0%, transparent 70%),
+    linear-gradient(135deg, #0a0f1e 0%, #0f172a 40%, #0a1628 70%, #111827 100%);
+  background-size: 40px 40px, 40px 40px, auto, auto, auto, auto, auto;
+}
+
+:is(.dark) .tech-bg::before {
+  animation: gridPulse 8s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+:is(.dark) .tech-bg::after {
+  opacity: 0.6;
+}
+
+/* Custom scrollbar dark mode */
+:is(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(0, 120, 212, 0.35);
+}
+
+:is(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 120, 212, 0.55);
 }
 
 .float-particle {
