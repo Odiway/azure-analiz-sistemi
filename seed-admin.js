@@ -57,7 +57,7 @@ async function resetAndSeed() {
 
   await sql`CREATE TABLE sticky_notes (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id),
     content TEXT NOT NULL DEFAULT '',
     color VARCHAR(20) NOT NULL DEFAULT 'yellow',
     expires_at TIMESTAMPTZ,

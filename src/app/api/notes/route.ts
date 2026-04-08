@@ -30,7 +30,7 @@ export async function GET() {
   });
 }
 
-// Create or update own note
+// Create new note
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -43,39 +43,58 @@ export async function POST(req: NextRequest) {
   const safeContent = String(content || '').slice(0, 500);
   const validExpiry = [15, 30, 60, 120, 240, 480, 1440].includes(expiryMinutes) ? expiryMinutes : null;
 
+  // Limit: max 5 active notes per user
   const sql = getSQL();
+  const count = await sql`SELECT COUNT(*) as cnt FROM sticky_notes WHERE user_id = ${userId} AND (expires_at IS NULL OR expires_at > NOW())`;
+  if (parseInt(count[0].cnt) >= 5) {
+    return NextResponse.json({ error: 'En fazla 5 aktif not ekleyebilirsiniz' }, { status: 400 });
+  }
 
-  // Upsert - each user has exactly one note
-  const existing = await sql`SELECT id FROM sticky_notes WHERE user_id = ${userId} LIMIT 1`;
-  
-  if (existing.length > 0) {
-    if (validExpiry) {
-      await sql`UPDATE sticky_notes SET content = ${safeContent}, color = ${safeColor}, expires_at = NOW() + ${validExpiry + ' minutes'}::interval, updated_at = NOW() WHERE user_id = ${userId}`;
-    } else {
-      await sql`UPDATE sticky_notes SET content = ${safeContent}, color = ${safeColor}, expires_at = NULL, updated_at = NOW() WHERE user_id = ${userId}`;
-    }
+  if (validExpiry) {
+    await sql`INSERT INTO sticky_notes (user_id, content, color, expires_at) VALUES (${userId}, ${safeContent}, ${safeColor}, NOW() + ${validExpiry + ' minutes'}::interval)`;
   } else {
-    if (validExpiry) {
-      await sql`INSERT INTO sticky_notes (user_id, content, color, expires_at) VALUES (${userId}, ${safeContent}, ${safeColor}, NOW() + ${validExpiry + ' minutes'}::interval)`;
-    } else {
-      await sql`INSERT INTO sticky_notes (user_id, content, color) VALUES (${userId}, ${safeContent}, ${safeColor})`;
-    }
+    await sql`INSERT INTO sticky_notes (user_id, content, color) VALUES (${userId}, ${safeContent}, ${safeColor})`;
   }
 
   return NextResponse.json({ success: true });
 }
 
-// Delete own note
-export async function DELETE() {
+// Update own note by id
+export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const { noteId, content, color, expiryMinutes } = await req.json();
+  const userId = parseInt(session.user.id);
+  const safeColor = ['yellow', 'blue', 'green', 'pink', 'purple', 'orange'].includes(color) ? color : 'yellow';
+  const safeContent = String(content || '').slice(0, 500);
+  const validExpiry = [15, 30, 60, 120, 240, 480, 1440].includes(expiryMinutes) ? expiryMinutes : null;
+
+  const sql = getSQL();
+
+  if (validExpiry) {
+    await sql`UPDATE sticky_notes SET content = ${safeContent}, color = ${safeColor}, expires_at = NOW() + ${validExpiry + ' minutes'}::interval, updated_at = NOW() WHERE id = ${noteId} AND user_id = ${userId}`;
+  } else {
+    await sql`UPDATE sticky_notes SET content = ${safeContent}, color = ${safeColor}, expires_at = NULL, updated_at = NOW() WHERE id = ${noteId} AND user_id = ${userId}`;
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+// Delete own note by id
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { noteId } = await req.json();
   const sql = getSQL();
   const userId = parseInt(session.user.id);
 
-  await sql`DELETE FROM sticky_notes WHERE user_id = ${userId}`;
+  await sql`DELETE FROM sticky_notes WHERE id = ${noteId} AND user_id = ${userId}`;
 
   return NextResponse.json({ success: true });
 }

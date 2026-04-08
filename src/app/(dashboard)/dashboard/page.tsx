@@ -137,6 +137,7 @@ export default function DashboardPage() {
   // Notes state
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteEditing, setNoteEditing] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const [noteColor, setNoteColor] = useState('yellow');
   const [noteExpiry, setNoteExpiry] = useState(0);
@@ -162,13 +163,36 @@ export default function DashboardPage() {
           for (const name of ['azure-1', 'azure-2'] as const) {
             const dn = name === 'azure-1' ? 'Azure 1' : 'Azure 2';
             if (prev[name].session && !data[name].session) {
-              toast(`${dn} artık müsait!`, 'success');
+              const exitedUser = prev[name].session!.userName;
+              toast(`${dn} artık müsait! (${exitedUser} çıktı)`, 'success');
               if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('Sunucu Müsait', { body: `${dn} artık boş!` });
+                new Notification(`🟢 ${dn} Müsait!`, {
+                  body: `${exitedUser} sunucudan çıktı — ${dn} artık boş!`,
+                  icon: '/favicon.ico',
+                  tag: `exit-${name}`,
+                  requireInteraction: false,
+                });
+              }
+            }
+            if (prev[name].session && data[name].session && prev[name].session!.userId !== data[name].session!.userId) {
+              const exitedUser = prev[name].session!.userName;
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(`🔄 ${dn} Kullanıcı Değişti`, {
+                  body: `${exitedUser} çıktı, ${data[name].session!.userName} giriş yaptı`,
+                  icon: '/favicon.ico',
+                  tag: `switch-${name}`,
+                });
               }
             }
             if (!prev[name].session && data[name].session && data[name].session!.userId !== me) {
               toast(`${dn} → ${data[name].session!.userName} giriş yaptı`, 'info');
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(`🔴 ${dn} Meşgul`, {
+                  body: `${data[name].session!.userName} sunucuya giriş yaptı`,
+                  icon: '/favicon.ico',
+                  tag: `enter-${name}`,
+                });
+              }
             }
           }
         }
@@ -275,7 +299,7 @@ export default function DashboardPage() {
 
   const myId = session?.user?.id ? parseInt(session.user.id) : null;
   const myActiveServer = Object.entries(servers).find(([, d]) => d.session && d.session.userId === myId)?.[0];
-  const myNote = notes.find((n) => n.user_id === myId);
+  const myNotes = notes.filter((n) => n.user_id === myId);
 
   // Notes fetch
   const fetchNotes = useCallback(async () => {
@@ -295,29 +319,56 @@ export default function DashboardPage() {
     if (!noteContent.trim()) return;
     setNoteSaving(true);
     try {
-      await fetch('/api/notes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: noteContent.trim(), color: noteColor, expiryMinutes: noteExpiry || undefined }),
-      });
+      if (editingNoteId) {
+        // Update existing
+        await fetch('/api/notes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ noteId: editingNoteId, content: noteContent.trim(), color: noteColor, expiryMinutes: noteExpiry || undefined }),
+        });
+      } else {
+        // Create new
+        const res = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: noteContent.trim(), color: noteColor, expiryMinutes: noteExpiry || undefined }),
+        });
+        const data = await res.json();
+        if (!res.ok) { toast(data.error, 'warn'); setNoteSaving(false); return; }
+      }
       setNoteEditing(false);
+      setEditingNoteId(null);
       await fetchNotes();
     } catch {} finally { setNoteSaving(false); }
   }
 
-  async function handleNoteDelete() {
+  async function handleNoteDelete(noteId: number) {
     setNoteSaving(true);
     try {
-      await fetch('/api/notes', { method: 'DELETE' });
+      await fetch('/api/notes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId }),
+      });
       setNoteEditing(false);
+      setEditingNoteId(null);
       await fetchNotes();
     } catch {} finally { setNoteSaving(false); }
   }
 
-  function startNoteEdit() {
-    setNoteContent(myNote?.content || '');
-    setNoteColor(myNote?.color || 'yellow');
+  function startNewNote() {
+    setNoteContent('');
+    setNoteColor('yellow');
     setNoteExpiry(0);
+    setEditingNoteId(null);
+    setNoteEditing(true);
+  }
+
+  function startEditNote(note: Note) {
+    setNoteContent(note.content);
+    setNoteColor(note.color);
+    setNoteExpiry(0);
+    setEditingNoteId(note.id);
     setNoteEditing(true);
   }
 
@@ -373,9 +424,14 @@ export default function DashboardPage() {
                     <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
                   </div>
                   {isMine && (
-                    <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
-                      <Pencil className="w-2.5 h-2.5 text-gray-600" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEditNote(note)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                        <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                      </button>
+                      <button onClick={() => handleNoteDelete(note.id)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-red-100 flex items-center justify-center transition-colors">
+                        <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="px-3 py-2">
@@ -658,12 +714,12 @@ export default function DashboardPage() {
       </div>
 
           {/* Note Add/Edit Form */}
-          <div className="bg-white rounded-3xl p-5 shadow-xl border border-amber-100">
+          <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-5 shadow-xl border border-amber-100">
             {noteEditing ? (
               <div className="space-y-3 animate-fade-in">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   <StickyNote className="w-4 h-4 text-amber-500" />
-                  {myNote ? 'Notunu Düzenle' : 'Yeni Not'}
+                  {editingNoteId ? 'Notu Düzenle' : 'Yeni Not'}
                 </h3>
                 <textarea
                   value={noteContent}
@@ -698,11 +754,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setNoteEditing(false)} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-xs transition-colors flex items-center gap-1">
+                  <button onClick={() => { setNoteEditing(false); setEditingNoteId(null); }} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-xs transition-colors flex items-center gap-1">
                     <X className="w-3 h-3" /> İptal
                   </button>
-                  {myNote && (
-                    <button onClick={handleNoteDelete} disabled={noteSaving} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors disabled:opacity-50 flex items-center gap-1">
+                  {editingNoteId && (
+                    <button onClick={() => handleNoteDelete(editingNoteId)} disabled={noteSaving} className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl font-semibold text-xs transition-colors disabled:opacity-50 flex items-center gap-1">
                       <Trash2 className="w-3 h-3" /> Sil
                     </button>
                   )}
@@ -720,11 +776,11 @@ export default function DashboardPage() {
                   <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">{notes.length}</span>
                 </div>
                 <button
-                  onClick={startNoteEdit}
+                  onClick={startNewNote}
                   className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl font-bold text-xs transition-all shadow-md shadow-amber-200/60 active:scale-[0.98]"
                 >
-                  {myNote ? <Pencil className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                  {myNote ? 'Düzenle' : 'Not Ekle'}
+                  <Plus className="w-3 h-3" />
+                  Not Ekle
                 </button>
               </div>
             )}
@@ -747,9 +803,14 @@ export default function DashboardPage() {
                           <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
                         </div>
                         {isMine && (
-                          <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
-                            <Pencil className="w-2.5 h-2.5 text-gray-600" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => startEditNote(note)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                              <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                            </button>
+                            <button onClick={() => handleNoteDelete(note.id)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-red-100 flex items-center justify-center transition-colors">
+                              <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                            </button>
+                          </div>
                         )}
                       </div>
                       <div className="px-3 py-2">
@@ -800,9 +861,14 @@ export default function DashboardPage() {
                     <span className={`font-bold text-xs ${c.text}`}>{note.user_name}</span>
                   </div>
                   {isMine && (
-                    <button onClick={startNoteEdit} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
-                      <Pencil className="w-2.5 h-2.5 text-gray-600" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEditNote(note)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-white/70 flex items-center justify-center transition-colors">
+                        <Pencil className="w-2.5 h-2.5 text-gray-600" />
+                      </button>
+                      <button onClick={() => handleNoteDelete(note.id)} className="w-5 h-5 rounded-lg bg-white/40 hover:bg-red-100 flex items-center justify-center transition-colors">
+                        <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                      </button>
+                    </div>
                   )}
                 </div>
                 <div className="px-3 py-2">
