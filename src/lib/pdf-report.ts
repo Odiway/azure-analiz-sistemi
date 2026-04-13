@@ -19,15 +19,15 @@ const GRAY = [156, 163, 175] as const;
 // Font - use helvetica (built-in, always works)
 const FONT = 'helvetica';
 
-// Turkish char transliteration for PDF (helvetica doesn't support ������)
+// Turkish char transliteration for PDF (helvetica doesn't support Turkish chars)
 function tr(text: string): string {
   return text
-    .replace(/�/g, 'I').replace(/�/g, 'i')
-    .replace(/�/g, 'S').replace(/�/g, 's')
-    .replace(/�/g, 'G').replace(/�/g, 'g')
-    .replace(/�/g, 'O').replace(/�/g, 'o')
-    .replace(/�/g, 'U').replace(/�/g, 'u')
-    .replace(/�/g, 'C').replace(/�/g, 'c');
+    .replace(/İ/g, 'I').replace(/ı/g, 'i')
+    .replace(/Ş/g, 'S').replace(/ş/g, 's')
+    .replace(/Ğ/g, 'G').replace(/ğ/g, 'g')
+    .replace(/Ö/g, 'O').replace(/ö/g, 'o')
+    .replace(/Ü/g, 'U').replace(/ü/g, 'u')
+    .replace(/Ç/g, 'C').replace(/ç/g, 'c');
 }
 
 interface WorkItem {
@@ -96,7 +96,7 @@ function addCorporateHeader(doc: jsPDF, title: string, subtitle?: string) {
   doc.setFontSize(9);
   doc.setFont(FONT, 'normal');
   doc.setTextColor(200, 220, 255);
-  doc.text(tr('CAE Departmani'), 15, 26);
+  doc.text('CAE Departmani', 15, 26);
 
   // Date on right
   doc.setFontSize(8);
@@ -107,7 +107,7 @@ function addCorporateHeader(doc: jsPDF, title: string, subtitle?: string) {
   doc.setFontSize(7);
   doc.setTextColor(255, 200, 100);
   doc.setFont(FONT, 'bold');
-  doc.text(tr('GIZLI / CONFIDENTIAL'), pageWidth - 15, 26, { align: 'right' });
+  doc.text('GIZLI / CONFIDENTIAL', pageWidth - 15, 26, { align: 'right' });
 
   // Report title
   doc.setFontSize(16);
@@ -221,7 +221,7 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // PAGE 1: Overview
-  let startY = addCorporateHeader(doc, tr('Genel Is Takip Raporu'), tr('CAE Departmani - Tum Proje ve Is Kalemleri Ozeti'));
+  let startY = addCorporateHeader(doc, 'Genel Is Takip Raporu', 'CAE Departmani - Tum Proje ve Is Kalemleri Ozeti');
 
   const total = summary.statusDistribution.reduce((s, d) => s + d.count, 0);
   const active = summary.statusDistribution.find(d => d.status === 'Devam Ediyor')?.count || 0;
@@ -307,18 +307,18 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
 
   // PAGE 2: Category + Project Distribution
   doc.addPage();
-  startY = addCorporateHeader(doc, 'Kategori ve Proje Da��l�m�', 'Detayl� i� kalemi da��l�m analizi');
+  startY = addCorporateHeader(doc, 'Kategori ve Proje Dagilimi', 'Detayli is kalemi dagilim analizi');
 
   // Category Table
   doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Kategori Bazl� Da��l�m', 15, startY);
+  doc.text('Kategori Bazli Dagilim', 15, startY);
   startY += 4;
 
   autoTable(doc, {
     startY,
-    head: [['Kategori', '�� Say�s�', 'Oran']],
+    head: [['Kategori', 'Is Sayisi', 'Oran']],
     body: summary.categoryDistribution.map(c => [tr(c.category), c.count.toString(), `%${total ? Math.round((c.count / total) * 100) : 0}`]),
     theme: 'grid',
     headStyles: { fillColor: [...TEMSA_BLUE], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -335,12 +335,12 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Proje Bazl� Da��l�m', 15, startY);
+  doc.text('Proje Bazli Dagilim', 15, startY);
   startY += 4;
 
   autoTable(doc, {
     startY,
-    head: [['Proje Kodu', 'Proje Ad�', 'Toplam', 'Tamamlanan', 'Devam Eden', 'Tamamlanma %']],
+    head: [['Proje Kodu', 'Proje Adi', 'Toplam', 'Tamamlanan', 'Devam Eden', 'Tamamlanma %']],
     body: summary.projectDistribution.map(p => [
       p.project_code, p.project_name, p.total.toString(), p.completed.toString(), p.active.toString(),
       `%${p.total ? Math.round((p.completed / p.total) * 100) : 0}`,
@@ -362,7 +362,7 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
 
   // PAGE 3+: Full work item list
   doc.addPage();
-  startY = addCorporateHeader(doc, 'T�m �� Kalemleri Listesi', `Toplam ${items.length} i� kalemi`);
+  startY = addCorporateHeader(doc, 'Tum Is Kalemleri Listesi', `Toplam ${items.length} is kalemi`);
 
   autoTable(doc, {
     startY,
@@ -421,7 +421,7 @@ export function generatePersonReport(
   setupFont(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let startY = addCorporateHeader(doc, `Ki�i Raporu: ${personName}`, tr('Bireysel is takip ve performans raporu'));
+  let startY = addCorporateHeader(doc, `Kisi Raporu: ${tr(personName)}`, 'Bireysel is takip ve performans raporu');
 
   const completionRate = workload.total ? Math.round((workload.completed / workload.total) * 100) : 0;
 
@@ -438,11 +438,11 @@ export function generatePersonReport(
 
   startY += boxH + 12;
 
-  // Progress bar 
+  // Progress bar
   doc.setFont(FONT, 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('�lerleme Durumu', 15, startY);
+  doc.text('Ilerleme Durumu', 15, startY);
   startY += 5;
 
   const barTotal = workload.total || 1;
@@ -457,7 +457,7 @@ export function generatePersonReport(
   const legendItems: { label: string; color: readonly [number, number, number] }[] = [
     { label: `Tamamlanan: ${workload.completed}`, color: GREEN },
     { label: `Devam Eden: ${workload.active}`, color: BLUE },
-    { label: `Ba�lanmam��: ${workload.not_started}`, color: GRAY },
+    { label: `Baslanmamis: ${workload.not_started}`, color: GRAY },
   ];
   let legendX = 15;
   legendItems.forEach(item => {
@@ -477,12 +477,12 @@ export function generatePersonReport(
     doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...TEMSA_BLUE);
-    doc.text(`Devam Eden ��ler (${activeItems.length})`, 15, startY);
+    doc.text(`Devam Eden Isler (${activeItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Ad�', 'Is Adi', 'Oncelik', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Oncelik', 'Kategori']],
       body: activeItems.map(item => [tr(item.project_code), tr(item.project_name), tr(item.task_name), tr(item.priority), tr(item.category)]),
       theme: 'grid',
       headStyles: { fillColor: [...BLUE], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -496,19 +496,19 @@ export function generatePersonReport(
   }
 
   // Completed work items table
-  const completedItems = items.filter(i => i.status === 'Tamamlandi');
+  const completedItems = items.filter(i => i.status === 'Tamamlandı');
   if (completedItems.length > 0) {
     if (startY > 230) { doc.addPage(); startY = 25; }
 
     doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...GREEN);
-    doc.text(`Tamamlanan ��ler (${completedItems.length})`, 15, startY);
+    doc.text(`Tamamlanan Isler (${completedItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Ad�', 'Is Adi', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Kategori']],
       body: completedItems.map(item => [tr(item.project_code), tr(item.project_name), tr(item.task_name), tr(item.category)]),
       theme: 'grid',
       headStyles: { fillColor: [...GREEN], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -522,19 +522,19 @@ export function generatePersonReport(
   }
 
   // Not started items
-  const nsItems = items.filter(i => i.status === 'Baslanmadi');
+  const nsItems = items.filter(i => i.status === 'Başlanmadı');
   if (nsItems.length > 0) {
     if (startY > 230) { doc.addPage(); startY = 25; }
 
     doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...GRAY);
-    doc.text(`Ba�lanmam�� ��ler (${nsItems.length})`, 15, startY);
+    doc.text(`Baslanmamis Isler (${nsItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Ad�', 'Is Adi', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Kategori']],
       body: nsItems.map(item => [tr(item.project_code), tr(item.project_name), tr(item.task_name), tr(item.category)]),
       theme: 'grid',
       headStyles: { fillColor: [140, 150, 165], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -548,7 +548,7 @@ export function generatePersonReport(
 
   // Full list on new page
   doc.addPage();
-  startY = addCorporateHeader(doc, `${personName} - T�m ��ler`, `Toplam ${items.length} i� kalemi`);
+  startY = addCorporateHeader(doc, `${tr(personName)} - Tum Isler`, `Toplam ${items.length} is kalemi`);
 
   autoTable(doc, {
     startY,
