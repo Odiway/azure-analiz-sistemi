@@ -634,14 +634,21 @@ export default function WorkTrackingPage() {
         fetch(`/api/work-items?assignedTo=${encodeURIComponent(personName)}`),
         fetch('/api/work-items/reports?type=summary'),
       ]);
-      if (!itemsRes.ok || !summaryRes.ok) return;
+      if (!itemsRes.ok || !summaryRes.ok) {
+        alert('PDF verileri alınamadı. Lütfen tekrar deneyin.');
+        return;
+      }
       const [personItems, summaryData] = await Promise.all([itemsRes.json(), summaryRes.json()]);
       const workload = summaryData.personWorkload?.find((p: any) => p.assigned_to === personName);
-      if (!workload) return;
+      if (!workload) {
+        alert('Kişi verisi bulunamadı.');
+        return;
+      }
       const { generatePersonReport } = await import('@/lib/pdf-report');
       generatePersonReport(personName, personItems, workload);
     } catch (e) {
       console.error('PDF Error:', e);
+      alert('PDF oluşturulurken hata oluştu.');
     }
   }
 

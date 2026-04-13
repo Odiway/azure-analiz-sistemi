@@ -39,7 +39,7 @@ export async function GET(req: Request) {
   }
 
   query += ` ORDER BY wl.log_date DESC`;
-  const logs = await sql.apply(null, [query, ...params] as Parameters<typeof sql>);
+  const logs = await sql(query, params);
   return NextResponse.json(logs);
 }
 

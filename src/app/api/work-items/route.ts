@@ -52,7 +52,7 @@ export async function GET(req: Request) {
   const safeSortDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
   query += ` ORDER BY ${safeSortBy} ${safeSortDir}`;
 
-  const items = await sql.apply(null, [query, ...params] as Parameters<typeof sql>);
+  const items = await sql(query, params);
   return NextResponse.json(items);
 }
 

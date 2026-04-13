@@ -68,11 +68,11 @@ function setupFont(doc: jsPDF) {
 
 function formatDateTR(d: string | null) {
   if (!d) return '-';
-  return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
+  return tr(new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' }));
 }
 
 function nowTR() {
-  return new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return tr(new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
 }
 
 function addCorporateHeader(doc: jsPDF, title: string, subtitle?: string) {
@@ -342,7 +342,7 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
     startY,
     head: [['Proje Kodu', 'Proje Adi', 'Toplam', 'Tamamlanan', 'Devam Eden', 'Tamamlanma %']],
     body: summary.projectDistribution.map(p => [
-      p.project_code, p.project_name, p.total.toString(), p.completed.toString(), p.active.toString(),
+      tr(p.project_code), tr(p.project_name), p.total.toString(), p.completed.toString(), p.active.toString(),
       `%${p.total ? Math.round((p.completed / p.total) * 100) : 0}`,
     ]),
     theme: 'grid',
