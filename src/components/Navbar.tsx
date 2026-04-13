@@ -3,7 +3,7 @@
 import { signOut, useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Server, LogOut, User, Monitor, Settings, Sun, Moon } from 'lucide-react';
+import { Server, LogOut, User, Monitor, Settings, Sun, Moon, Briefcase } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
@@ -42,6 +42,17 @@ export default function Navbar() {
             >
               <Monitor className="w-4 h-4" />
               <span className="hidden sm:inline">Sunucular</span>
+            </Link>
+            <Link
+              href="/work-tracking"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === '/work-tracking'
+                  ? 'bg-azure-50 dark:bg-azure-500/15 text-azure-700 dark:text-azure-400'
+                  : 'text-navy-500 dark:text-navy-300 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-navy-700 dark:hover:text-white'
+              }`}
+            >
+              <Briefcase className="w-4 h-4" />
+              <span className="hidden sm:inline">İş Takip</span>
             </Link>
             <Link
               href="/settings"
