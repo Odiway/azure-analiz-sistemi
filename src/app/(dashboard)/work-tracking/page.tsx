@@ -1,15 +1,13 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
-  Briefcase, Search, Filter, ChevronDown, ChevronUp, Plus, X, Save, Trash2,
-  BarChart3, Users, FolderKanban, Clock, CheckCircle, AlertCircle, Pause,
-  TrendingUp, ArrowUpDown, Pencil, Eye, ChevronLeft, ChevronRight, Download, FileSpreadsheet,
+  Briefcase, Plus, X, Save, Trash2, ChevronLeft, ChevronRight,
+  Download, FileSpreadsheet, Calendar,
 } from 'lucide-react';
-import { generateGeneralReport, generatePersonReport } from '@/lib/pdf-report';
-import { generateGeneralExcel, generatePersonExcel } from '@/lib/excel-report';
 
+// ===================== TYPES =====================
 interface WorkItem {
   id: number;
   project_code: string;
@@ -21,80 +19,102 @@ interface WorkItem {
   category: string;
   start_date: string | null;
   target_date: string | null;
-  completed_date: string | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
-interface Filters {
-  people: string[];
-  projects: { project_code: string; project_name: string }[];
-  categories: string[];
-  statuses: string[];
+interface WeekInfo {
+  week: number;
+  monday: Date;
+  month: number;
+  isCurrent: boolean;
 }
 
-interface SummaryData {
-  statusDistribution: { status: string; count: number }[];
-  personWorkload: { assigned_to: string; total: number; active: number; completed: number; not_started: number }[];
-  categoryDistribution: { category: string; count: number }[];
-  projectDistribution: { project_code: string; project_name: string; total: number; completed: number; active: number }[];
-  totalHours: { total: number; items_with_logs: number };
-}
+// ===================== CONSTANTS =====================
+const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const MONTHS_SHORT = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
-type Tab = 'overview' | 'table' | 'person' | 'reports';
+const MONTH_HEADER_COLORS = [
+  'bg-blue-600', 'bg-cyan-600', 'bg-teal-600', 'bg-emerald-600',
+  'bg-green-600', 'bg-lime-600', 'bg-yellow-600', 'bg-amber-600',
+  'bg-orange-600', 'bg-rose-600', 'bg-pink-600', 'bg-purple-600',
+];
 
-const statusConfig: Record<string, { color: string; darkColor: string; icon: React.ReactNode; bg: string; darkBg: string }> = {
-  'Devam Ediyor': { color: 'text-blue-700', darkColor: 'dark:text-blue-400', icon: <Clock className="w-3.5 h-3.5" />, bg: 'bg-blue-100', darkBg: 'dark:bg-blue-500/20' },
-  'Tamamlandı': { color: 'text-green-700', darkColor: 'dark:text-green-400', icon: <CheckCircle className="w-3.5 h-3.5" />, bg: 'bg-green-100', darkBg: 'dark:bg-green-500/20' },
-  'Başlanmadı': { color: 'text-gray-600', darkColor: 'dark:text-gray-400', icon: <Pause className="w-3.5 h-3.5" />, bg: 'bg-gray-100', darkBg: 'dark:bg-gray-500/20' },
-  'Data Bekleniyor': { color: 'text-amber-700', darkColor: 'dark:text-amber-400', icon: <AlertCircle className="w-3.5 h-3.5" />, bg: 'bg-amber-100', darkBg: 'dark:bg-amber-500/20' },
+const MONTH_CELL_COLORS = [
+  'bg-blue-50/60 dark:bg-blue-950/20', 'bg-cyan-50/60 dark:bg-cyan-950/20',
+  'bg-teal-50/60 dark:bg-teal-950/20', 'bg-emerald-50/60 dark:bg-emerald-950/20',
+  'bg-green-50/60 dark:bg-green-950/20', 'bg-lime-50/60 dark:bg-lime-950/20',
+  'bg-yellow-50/60 dark:bg-yellow-950/20', 'bg-amber-50/60 dark:bg-amber-950/20',
+  'bg-orange-50/60 dark:bg-orange-950/20', 'bg-rose-50/60 dark:bg-rose-950/20',
+  'bg-pink-50/60 dark:bg-pink-950/20', 'bg-purple-50/60 dark:bg-purple-950/20',
+];
+
+const STATUS_DOTS: Record<string, string> = {
+  'Devam Ediyor': 'bg-blue-500',
+  'Tamamlandı': 'bg-emerald-500',
+  'Başlanmadı': 'bg-gray-400',
+  'Data Bekleniyor': 'bg-amber-500',
 };
 
-const priorityColors: Record<string, string> = {
-  'Yüksek': 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400',
-  'Orta': 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400',
-  'Düşük': 'bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-400',
-};
+// ===================== WEEK HELPERS =====================
+function getWeeksForYear(year: number): WeekInfo[] {
+  const result: WeekInfo[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg = statusConfig[status] || statusConfig['Başlanmadı'];
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${cfg.bg} ${cfg.darkBg} ${cfg.color} ${cfg.darkColor}`}>
-      {cfg.icon} {status}
-    </span>
-  );
+  const jan4 = new Date(year, 0, 4);
+  const dow = jan4.getDay() || 7;
+  const w1Mon = new Date(year, 0, 4 - dow + 1);
+
+  for (let i = 0; i < 53; i++) {
+    const monday = new Date(w1Mon);
+    monday.setDate(w1Mon.getDate() + i * 7);
+    const thursday = new Date(monday);
+    thursday.setDate(monday.getDate() + 3);
+    if (thursday.getFullYear() > year) break;
+
+    const nextMon = new Date(monday);
+    nextMon.setDate(monday.getDate() + 7);
+    const isCurrent = today >= monday && today < nextMon;
+
+    result.push({ week: i + 1, monday, month: thursday.getMonth(), isCurrent });
+  }
+  return result;
 }
 
-function formatDate(d: string | null) {
-  if (!d) return '-';
-  return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+function groupWeeksByMonth(weeks: WeekInfo[]) {
+  const groups: { month: number; name: string; weeks: WeekInfo[] }[] = [];
+  let currentMonth = -1;
+  for (const w of weeks) {
+    if (w.month !== currentMonth) {
+      currentMonth = w.month;
+      groups.push({ month: w.month, name: MONTHS_TR[w.month], weeks: [] });
+    }
+    groups[groups.length - 1].weeks.push(w);
+  }
+  return groups;
 }
 
+// ===================== PAGE COMPONENT =====================
 export default function WorkTrackingPage() {
   const { data: session } = useSession();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [year, setYear] = useState(new Date().getFullYear());
   const [items, setItems] = useState<WorkItem[]>([]);
-  const [filters, setFilters] = useState<Filters>({ people: [], projects: [], categories: [], statuses: [] });
-  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [logs, setLogs] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [filterPerson, setFilterPerson] = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [people, setPeople] = useState<string[]>([]);
+  const [projects, setProjects] = useState<{ project_code: string; project_name: string }[]>([]);
 
-  // Filters state
-  const [fStatus, setFStatus] = useState('all');
-  const [fPerson, setFPerson] = useState('all');
-  const [fProject, setFProject] = useState('all');
-  const [fCategory, setFCategory] = useState('all');
-  const [fSearch, setFSearch] = useState('');
-  const [sortBy, setSortBy] = useState('updated_at');
-  const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('DESC');
+  // Cell editing
+  const [editCell, setEditCell] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Pagination
-  const [page, setPage] = useState(1);
-  const perPage = 20;
-
-  // Modal
+  // Add/Edit modal
+  const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState<WorkItem | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     project_code: '', project_name: '', task_name: '', assigned_to: '',
@@ -102,59 +122,153 @@ export default function WorkTrackingPage() {
     start_date: '', target_date: '', notes: '',
   });
 
-  // Person report
-  const [reportPerson, setReportPerson] = useState('all');
+  // Scroll refs
+  const currentWeekRef = useRef<HTMLTableCellElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const fetchFilters = useCallback(async () => {
+  // Computed
+  const weeks = useMemo(() => getWeeksForYear(year), [year]);
+  const monthGroups = useMemo(() => groupWeeksByMonth(weeks), [weeks]);
+
+  const statuses = useMemo(() => Array.from(new Set(items.map(i => i.status))).sort(), [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      if (filterPerson !== 'all' && item.assigned_to !== filterPerson) return false;
+      if (filterProject !== 'all' && item.project_code !== filterProject) return false;
+      if (filterStatus !== 'all' && item.status !== filterStatus) return false;
+      return true;
+    });
+  }, [items, filterPerson, filterProject, filterStatus]);
+
+  const weekTotals = useMemo(() => {
+    const totals: Record<number, number> = {};
+    for (const item of filteredItems) {
+      for (const w of weeks) {
+        const h = logs[`${item.id}_${w.week}`];
+        if (h) totals[w.week] = (totals[w.week] || 0) + h;
+      }
+    }
+    return totals;
+  }, [filteredItems, weeks, logs]);
+
+  const itemTotals = useMemo(() => {
+    const totals: Record<number, number> = {};
+    for (const item of filteredItems) {
+      let total = 0;
+      for (const w of weeks) {
+        total += logs[`${item.id}_${w.week}`] || 0;
+      }
+      if (total > 0) totals[item.id] = total;
+    }
+    return totals;
+  }, [filteredItems, weeks, logs]);
+
+  const grandTotal = useMemo(() => Object.values(itemTotals).reduce((a, b) => a + b, 0), [itemTotals]);
+
+  // ===================== DATA FETCHING =====================
+  const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/work-items/reports?type=filters');
-      if (res.ok) setFilters(await res.json());
-    } catch {}
-  }, []);
+      const res = await fetch(`/api/work-items/weekly?year=${year}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items);
+        setLogs(data.logs);
+        setPeople(data.people);
+        setProjects(data.projects);
+      }
+    } catch { /* ignore */ } finally {
+      setLoading(false);
+    }
+  }, [year]);
 
-  const fetchItems = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (fStatus !== 'all') params.set('status', fStatus);
-    if (fPerson !== 'all') params.set('assignedTo', fPerson);
-    if (fProject !== 'all') params.set('projectCode', fProject);
-    if (fCategory !== 'all') params.set('category', fCategory);
-    if (fSearch) params.set('search', fSearch);
-    params.set('sortBy', sortBy);
-    params.set('sortDir', sortDir);
-    try {
-      const res = await fetch(`/api/work-items?${params}`);
-      if (res.ok) setItems(await res.json());
-    } catch {}
-  }, [fStatus, fPerson, fProject, fCategory, fSearch, sortBy, sortDir]);
+  useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const res = await fetch('/api/work-items/reports?type=summary');
-      if (res.ok) setSummary(await res.json());
-    } catch {}
-  }, []);
-
+  // Scroll to current week on load
   useEffect(() => {
-    Promise.all([fetchFilters(), fetchItems(), fetchSummary()]).finally(() => setLoading(false));
-  }, [fetchFilters, fetchItems, fetchSummary]);
+    if (!loading && currentWeekRef.current && scrollContainerRef.current) {
+      const cell = currentWeekRef.current;
+      cell.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'center' });
+    }
+  }, [loading]);
 
-  useEffect(() => { fetchItems(); }, [fetchItems]);
+  // Focus input on edit
+  useEffect(() => {
+    if (editCell && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editCell]);
 
-  const paginatedItems = useMemo(() => {
-    const start = (page - 1) * perPage;
-    return items.slice(start, start + perPage);
-  }, [items, page]);
+  // ===================== CELL OPERATIONS =====================
+  async function saveHours(itemId: number, weekNum: number, value: string) {
+    const hours = parseFloat(value) || 0;
+    const key = `${itemId}_${weekNum}`;
 
-  const totalPages = Math.ceil(items.length / perPage);
+    // Optimistic update
+    setLogs(prev => {
+      const next = { ...prev };
+      if (hours <= 0) delete next[key];
+      else next[key] = hours;
+      return next;
+    });
+    setEditCell(null);
 
-  function toggleSort(col: string) {
-    if (sortBy === col) setSortDir(d => d === 'ASC' ? 'DESC' : 'ASC');
-    else { setSortBy(col); setSortDir('ASC'); }
-    setPage(1);
+    try {
+      await fetch('/api/work-items/weekly', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ work_item_id: itemId, week_number: weekNum, year, hours }),
+      });
+    } catch {
+      fetchData(); // rollback
+    }
+  }
+
+  function handleCellClick(itemId: number, weekNum: number) {
+    const key = `${itemId}_${weekNum}`;
+    if (editCell === key) return;
+    setEditCell(key);
+    setEditValue(logs[key]?.toString() || '');
+  }
+
+  function handleCellKeyDown(e: React.KeyboardEvent, itemId: number, weekNum: number) {
+    if (e.key === 'Enter') {
+      saveHours(itemId, weekNum, editValue);
+    } else if (e.key === 'Escape') {
+      setEditCell(null);
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      saveHours(itemId, weekNum, editValue);
+      const nextWeek = weeks.find(w => w.week === weekNum + 1);
+      if (nextWeek) {
+        const nextKey = `${itemId}_${nextWeek.week}`;
+        setTimeout(() => {
+          setEditCell(nextKey);
+          setEditValue(logs[nextKey]?.toString() || '');
+        }, 50);
+      }
+    }
+  }
+
+  function handleCellBlur(itemId: number, weekNum: number) {
+    saveHours(itemId, weekNum, editValue);
+  }
+
+  // ===================== MODAL OPERATIONS =====================
+  function openAdd() {
+    setEditItem(null);
+    setShowModal(true);
+    setForm({
+      project_code: '', project_name: '', task_name: '', assigned_to: '',
+      status: 'Başlanmadı', priority: 'Orta', category: 'Genel',
+      start_date: '', target_date: '', notes: '',
+    });
   }
 
   function openEdit(item: WorkItem) {
     setEditItem(item);
+    setShowModal(true);
     setForm({
       project_code: item.project_code,
       project_name: item.project_name,
@@ -166,16 +280,6 @@ export default function WorkTrackingPage() {
       start_date: item.start_date?.split('T')[0] || '',
       target_date: item.target_date?.split('T')[0] || '',
       notes: item.notes || '',
-    });
-  }
-
-  function openAdd() {
-    setEditItem(null);
-    setShowAdd(true);
-    setForm({
-      project_code: '', project_name: '', task_name: '', assigned_to: '',
-      status: 'Başlanmadı', priority: 'Orta', category: 'Genel',
-      start_date: '', target_date: '', notes: '',
     });
   }
 
@@ -195,37 +299,96 @@ export default function WorkTrackingPage() {
           body: JSON.stringify(form),
         });
       }
+      setShowModal(false);
       setEditItem(null);
-      setShowAdd(false);
-      await Promise.all([fetchItems(), fetchSummary()]);
-    } catch {} finally { setSaving(false); }
+      await fetchData();
+    } catch { /* ignore */ } finally { setSaving(false); }
   }
 
   async function handleDelete(id: number) {
     if (!confirm('Bu iş kalemini silmek istediğinize emin misiniz?')) return;
     await fetch(`/api/work-items/${id}`, { method: 'DELETE' });
+    setShowModal(false);
     setEditItem(null);
-    await Promise.all([fetchItems(), fetchSummary()]);
+    await fetchData();
   }
 
-  // Person report data
-  const personReportData = useMemo(() => {
-    if (!summary) return [];
-    return summary.personWorkload.filter(p =>
-      reportPerson === 'all' || p.assigned_to === reportPerson
-    );
-  }, [summary, reportPerson]);
+  function scrollToCurrentWeek() {
+    if (currentWeekRef.current) {
+      currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  }
 
-  // Overview stats
-  const overviewStats = useMemo(() => {
-    if (!summary) return null;
-    const total = summary.statusDistribution.reduce((s, d) => s + d.count, 0);
-    const active = summary.statusDistribution.find(d => d.status === 'Devam Ediyor')?.count || 0;
-    const completed = summary.statusDistribution.find(d => d.status === 'Tamamlandı')?.count || 0;
-    const notStarted = summary.statusDistribution.find(d => d.status === 'Başlanmadı')?.count || 0;
-    return { total, active, completed, notStarted, completionRate: total ? Math.round((completed / total) * 100) : 0 };
-  }, [summary]);
+  // ===================== EXCEL EXPORT =====================
+  async function exportWeeklyExcel() {
+    const XLSX = (await import('xlsx')).default;
+    const wb = XLSX.utils.book_new();
 
+    // Sheet: Haftalık Plan
+    const headerRow1 = ['Proje Kodu', 'Projenin Adı', 'Çalışmanın Adı', 'Çalışan Kişi', 'Durum', 'Toplam'];
+    weeks.forEach(w => headerRow1.push(`W${w.week}`));
+
+    const headerRow2 = ['', '', '', '', '', ''];
+    weeks.forEach(w => headerRow2.push(`${w.monday.getDate()} ${MONTHS_SHORT[w.monday.getMonth()]}`));
+
+    const rows: (string | number)[][] = [headerRow1, headerRow2];
+
+    for (const item of filteredItems) {
+      const row: (string | number)[] = [
+        item.project_code, item.project_name, item.task_name,
+        item.assigned_to, item.status, itemTotals[item.id] || 0,
+      ];
+      weeks.forEach(w => {
+        const h = logs[`${item.id}_${w.week}`];
+        row.push(h || '');
+      });
+      rows.push(row);
+    }
+
+    // Total row
+    const totalRow: (string | number)[] = ['TOPLAM', '', '', '', '', grandTotal];
+    weeks.forEach(w => totalRow.push(weekTotals[w.week] || ''));
+    rows.push(totalRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 18 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 8 },
+      ...weeks.map(() => ({ wch: 5 })),
+    ];
+
+    // Merge month headers - add month row
+    XLSX.utils.book_append_sheet(wb, ws, 'Haftalık Plan');
+
+    // Sheet: Kişi Özeti
+    const personRows: (string | number)[][] = [['Kişi', 'Toplam Saat']];
+    const personTotals: Record<string, number> = {};
+    for (const item of items) {
+      for (const w of weeks) {
+        const h = logs[`${item.id}_${w.week}`];
+        if (h) personTotals[item.assigned_to] = (personTotals[item.assigned_to] || 0) + h;
+      }
+    }
+    Object.entries(personTotals).sort((a, b) => b[1] - a[1]).forEach(([name, hours]) => {
+      personRows.push([name, hours]);
+    });
+
+    const ws2 = XLSX.utils.aoa_to_sheet(personRows);
+    ws2['!cols'] = [{ wch: 15 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Kişi Özeti');
+
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TEMSA_CAE_Is_Plani_${year}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ===================== LOADING STATE =====================
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -240,532 +403,270 @@ export default function WorkTrackingPage() {
     );
   }
 
+  // ===================== RENDER =====================
   return (
-    <div className="max-w-[1600px] mx-auto animate-fade-in py-4 px-4">
+    <div className="max-w-full mx-auto animate-fade-in py-3 px-3">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
         <div>
-          <h1 className="text-3xl font-extrabold text-navy-900 dark:text-white tracking-tight flex items-center gap-3">
-            <Briefcase className="w-8 h-8 text-azure-500" />
+          <h1 className="text-2xl font-extrabold text-navy-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <Briefcase className="w-7 h-7 text-azure-500" />
             İş Takip Sistemi
           </h1>
-          <p className="text-navy-400 dark:text-navy-300 text-sm mt-1">
-            CAE ekibi iş planı ve raporlama
+          <p className="text-navy-400 dark:text-navy-300 text-xs mt-0.5">
+            CAE Departmanı — Haftalık İş Planı
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => summary && generateGeneralExcel(items, summary)}
-            disabled={!summary}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-40"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Excel
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 rounded-xl px-1.5 py-1">
+            <button onClick={() => setYear(y => y - 1)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-700 transition-colors">
+              <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            </button>
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-200 min-w-[44px] text-center">{year}</span>
+            <button onClick={() => setYear(y => y + 1)} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-700 transition-colors">
+              <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            </button>
+          </div>
+          <button onClick={scrollToCurrentWeek} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 rounded-xl text-xs font-bold text-azure-600 dark:text-azure-400 transition-all">
+            <Calendar className="w-3.5 h-3.5" /> Bugün
           </button>
-          <button
-            onClick={() => summary && generateGeneralReport(items, summary)}
-            disabled={!summary}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-red-600 dark:text-red-400 rounded-xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-40"
-          >
-            <Download className="w-4 h-4" /> PDF
+          <button onClick={exportWeeklyExcel} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold transition-all">
+            <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
           </button>
-          <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30 active:scale-[0.98]">
-            <Plus className="w-4 h-4" /> Yeni İş Ekle
+          <button onClick={openAdd} className="flex items-center gap-1 px-2.5 py-2 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30">
+            <Plus className="w-3.5 h-3.5" /> Yeni İş
           </button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-white/60 dark:bg-navy-900/60 backdrop-blur-sm rounded-2xl p-1.5 border border-gray-200 dark:border-navy-700 w-fit">
-        {([
-          { key: 'overview', label: 'Genel Bakış', icon: <BarChart3 className="w-4 h-4" /> },
-          { key: 'table', label: 'İş Listesi', icon: <FolderKanban className="w-4 h-4" /> },
-          { key: 'person', label: 'Kişi Raporu', icon: <Users className="w-4 h-4" /> },
-          { key: 'reports', label: 'Proje Raporu', icon: <TrendingUp className="w-4 h-4" /> },
-        ] as { key: Tab; label: string; icon: React.ReactNode }[]).map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
-              tab === t.key
-                ? 'bg-azure-500 text-white shadow-md'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-navy-800'
-            }`}
-          >
-            {t.icon} <span className="hidden sm:inline">{t.label}</span>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+          <option value="all">Tüm Kişiler</option>
+          {people.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+          <option value="all">Tüm Projeler</option>
+          {projects.map(p => <option key={p.project_code} value={p.project_code}>{p.project_code} - {p.project_name}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+          <option value="all">Tüm Durumlar</option>
+          {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {(filterPerson !== 'all' || filterProject !== 'all' || filterStatus !== 'all') && (
+          <button onClick={() => { setFilterPerson('all'); setFilterProject('all'); setFilterStatus('all'); }} className="flex items-center gap-1 px-2.5 py-1.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-lg text-xs font-bold transition-colors">
+            <X className="w-3 h-3" /> Temizle
           </button>
-        ))}
+        )}
+        <div className="flex items-center gap-2 ml-auto text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+          <span>{filteredItems.length} iş</span>
+          <span className="text-gray-300 dark:text-gray-600">•</span>
+          <span>{grandTotal} saat</span>
+        </div>
       </div>
 
-      {/* OVERVIEW TAB */}
-      {tab === 'overview' && overviewStats && summary && (
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            {[
-              { label: 'Toplam İş', value: overviewStats.total, color: 'from-azure-500 to-blue-600', icon: <Briefcase className="w-5 h-5" /> },
-              { label: 'Devam Eden', value: overviewStats.active, color: 'from-blue-500 to-indigo-600', icon: <Clock className="w-5 h-5" /> },
-              { label: 'Tamamlanan', value: overviewStats.completed, color: 'from-emerald-500 to-green-600', icon: <CheckCircle className="w-5 h-5" /> },
-              { label: 'Başlanmamış', value: overviewStats.notStarted, color: 'from-gray-400 to-gray-500', icon: <Pause className="w-5 h-5" /> },
-              { label: 'Tamamlanma', value: `%${overviewStats.completionRate}`, color: 'from-purple-500 to-violet-600', icon: <TrendingUp className="w-5 h-5" /> },
-            ].map((s, i) => (
-              <div key={i} className="bg-white dark:bg-navy-900 rounded-2xl p-5 shadow-lg border border-gray-100 dark:border-navy-800 transition-colors">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center text-white`}>
-                    {s.icon}
-                  </div>
-                  <span className="text-3xl font-black text-gray-900 dark:text-white">{s.value}</span>
-                </div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Status Distribution Bar */}
-          <div className="bg-white dark:bg-navy-900 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-navy-800">
-            <h3 className="font-bold text-gray-900 dark:text-white mb-4">Durum Dağılımı</h3>
-            <div className="h-6 rounded-full overflow-hidden flex bg-gray-100 dark:bg-navy-800">
-              {summary.statusDistribution.map((d, i) => {
-                const pct = overviewStats.total ? (d.count / overviewStats.total) * 100 : 0;
-                const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-gray-400', 'bg-amber-500'];
-                return (
-                  <div
-                    key={d.status}
-                    className={`${colors[i] || colors[0]} transition-all relative group`}
-                    style={{ width: `${pct}%` }}
-                    title={`${d.status}: ${d.count} (%${Math.round(pct)})`}
-                  >
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      {pct > 12 && <span className="text-white text-[10px] font-bold">{d.count}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-4 mt-3">
-              {summary.statusDistribution.map((d, i) => {
-                const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-gray-400', 'bg-amber-500'];
-                return (
-                  <div key={d.status} className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400">
-                    <div className={`w-3 h-3 rounded-full ${colors[i] || colors[0]}`} />
-                    {d.status} ({d.count})
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Person Workload */}
-          <div className="bg-white dark:bg-navy-900 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-navy-800">
-            <h3 className="font-bold text-gray-900 dark:text-white mb-4">Kişi Bazlı İş Yükü</h3>
-            <div className="space-y-3">
-              {summary.personWorkload.map((p) => {
-                const total = overviewStats.total || 1;
-                return (
-                  <div key={p.assigned_to} className="flex items-center gap-4">
-                    <div className="w-24 text-sm font-bold text-gray-800 dark:text-gray-200 truncate">{p.assigned_to}</div>
-                    <div className="flex-1 h-7 rounded-lg overflow-hidden flex bg-gray-100 dark:bg-navy-800">
-                      <div className="bg-emerald-500 transition-all" style={{ width: `${(p.completed / total) * 100}%` }} title={`Tamamlanan: ${p.completed}`} />
-                      <div className="bg-blue-500 transition-all" style={{ width: `${(p.active / total) * 100}%` }} title={`Devam eden: ${p.active}`} />
-                      <div className="bg-gray-300 dark:bg-gray-600 transition-all" style={{ width: `${(p.not_started / total) * 100}%` }} title={`Başlanmamış: ${p.not_started}`} />
-                    </div>
-                    <div className="w-16 text-right">
-                      <span className="text-sm font-bold text-gray-900 dark:text-white">{p.total}</span>
-                      <span className="text-xs text-gray-400 ml-1">iş</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex gap-4 mt-4 pt-3 border-t border-gray-100 dark:border-navy-700">
-              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-emerald-500" /> Tamamlanan
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-blue-500" /> Devam Eden
-              </div>
-              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-                <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" /> Başlanmamış
-              </div>
-            </div>
-          </div>
-
-          {/* Category Distribution */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-navy-900 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-navy-800">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">Kategori Dağılımı</h3>
-              <div className="space-y-2">
-                {summary.categoryDistribution.map((c) => {
-                  const maxCount = summary.categoryDistribution[0]?.count || 1;
-                  return (
-                    <div key={c.category} className="flex items-center gap-3">
-                      <span className="w-28 text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{c.category}</span>
-                      <div className="flex-1 h-5 rounded-md overflow-hidden bg-gray-100 dark:bg-navy-800">
-                        <div className="h-full bg-gradient-to-r from-azure-400 to-blue-500 rounded-md transition-all" style={{ width: `${(c.count / maxCount) * 100}%` }} />
-                      </div>
-                      <span className="w-8 text-right text-xs font-bold text-gray-700 dark:text-gray-300">{c.count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-navy-900 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-navy-800">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">Proje Dağılımı</h3>
-              <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                {summary.projectDistribution.map((p) => (
-                  <div key={p.project_code + p.project_name} className="flex items-center justify-between py-2 px-3 rounded-xl bg-gray-50 dark:bg-navy-800/50 hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors">
-                    <div>
-                      <span className="text-xs font-mono font-bold text-azure-600 dark:text-azure-400">{p.project_code}</span>
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 ml-2">{p.project_name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded">{p.completed}✓</span>
-                      <span className="text-[10px] font-bold bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400 px-1.5 py-0.5 rounded">{p.active}⟳</span>
-                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{p.total}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TABLE TAB */}
-      {tab === 'table' && (
-        <div className="space-y-4">
-          {/* Quick Status Chips */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { key: 'all', label: 'Tümü', color: 'bg-gray-100 dark:bg-navy-800 text-gray-700 dark:text-gray-300' },
-              { key: 'Devam Ediyor', label: 'Devam Eden', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
-              { key: 'Tamamlandı', label: 'Tamamlanan', color: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
-              { key: 'Başlanmadı', label: 'Başlanmamış', color: 'bg-gray-200 dark:bg-gray-600/30 text-gray-600 dark:text-gray-400' },
-              { key: 'Data Bekleniyor', label: 'Data Bekleniyor', color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
-            ].map(chip => (
-              <button
-                key={chip.key}
-                onClick={() => { setFStatus(chip.key); setPage(1); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  fStatus === chip.key
-                    ? `${chip.color} ring-2 ring-azure-400 dark:ring-azure-500 shadow-md scale-105`
-                    : `${chip.color} opacity-60 hover:opacity-100`
-                }`}
+      {/* =================== WEEKLY GRID =================== */}
+      <div
+        ref={scrollContainerRef}
+        className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 overflow-auto select-none"
+        style={{ maxHeight: 'calc(100vh - 200px)' }}
+      >
+        <table className="border-collapse" style={{ minWidth: `${465 + weeks.length * 46}px` }}>
+          <thead className="sticky top-0 z-30">
+            {/* Row 1: Month headers */}
+            <tr>
+              <th
+                colSpan={5}
+                className="sticky left-0 z-40 bg-[#00529B] text-white px-3 py-2 text-left text-[11px] font-bold border-b border-r border-[#003d75] whitespace-nowrap"
+                style={{ minWidth: '465px' }}
               >
-                {chip.label}
-                {chip.key !== 'all' && summary && (
-                  <span className="ml-1.5 opacity-70">
-                    {summary.statusDistribution.find(d => d.status === chip.key)?.count || 0}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Filters Bar */}
-          <div className="bg-white dark:bg-navy-900 rounded-2xl p-4 shadow-lg border border-gray-100 dark:border-navy-800">
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={fSearch}
-                  onChange={(e) => { setFSearch(e.target.value); setPage(1); }}
-                  placeholder="İş adı, proje, kişi veya kategori ara..."
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400"
-                />
-                {fSearch && (
-                  <button onClick={() => { setFSearch(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-navy-700 transition-colors">
-                    <X className="w-3.5 h-3.5 text-gray-400" />
-                  </button>
-                )}
-              </div>
-              <select value={fPerson} onChange={e => { setFPerson(e.target.value); setPage(1); }} className="px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                <option value="all">Tüm Kişiler</option>
-                {filters.people.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select value={fProject} onChange={e => { setFProject(e.target.value); setPage(1); }} className="px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                <option value="all">Tüm Projeler</option>
-                {filters.projects.map(p => <option key={p.project_code} value={p.project_code}>{p.project_code} - {p.project_name}</option>)}
-              </select>
-              <select value={fCategory} onChange={e => { setFCategory(e.target.value); setPage(1); }} className="px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                <option value="all">Tüm Kategoriler</option>
-                {filters.categories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              {(fStatus !== 'all' || fPerson !== 'all' || fProject !== 'all' || fCategory !== 'all' || fSearch) && (
-                <button
-                  onClick={() => { setFStatus('all'); setFPerson('all'); setFProject('all'); setFCategory('all'); setFSearch(''); setPage(1); }}
-                  className="flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-colors"
+                Planlanan Çalışma — {year}
+              </th>
+              {monthGroups.map(mg => (
+                <th
+                  key={mg.month}
+                  colSpan={mg.weeks.length}
+                  className={`${MONTH_HEADER_COLORS[mg.month]} text-white px-1 py-2 text-center text-[11px] font-bold border-b border-r border-white/20 whitespace-nowrap`}
                 >
-                  <X className="w-3.5 h-3.5" /> Temizle
-                </button>
-              )}
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap flex items-center gap-1.5">
-                <Filter className="w-3.5 h-3.5" />
-                {items.length} sonuç
-              </div>
-            </div>
-          </div>
+                  {mg.name}
+                </th>
+              ))}
+            </tr>
 
-          {/* Table */}
-          <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-navy-800/50 border-b border-gray-100 dark:border-navy-700">
-                    {[
-                      { key: 'project_code', label: 'Proje' },
-                      { key: 'task_name', label: 'İş Adı' },
-                      { key: 'assigned_to', label: 'Kişi' },
-                      { key: 'status', label: 'Durum' },
-                      { key: 'priority', label: 'Öncelik' },
-                      { key: 'category', label: 'Kategori' },
-                      { key: 'updated_at', label: 'Güncelleme' },
-                    ].map(col => (
-                      <th
-                        key={col.key}
-                        onClick={() => toggleSort(col.key)}
-                        className="px-4 py-3 text-left text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:text-azure-500 transition-colors select-none"
-                      >
-                        <span className="flex items-center gap-1">
-                          {col.label}
-                          {sortBy === col.key && (sortDir === 'ASC' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                          {sortBy !== col.key && <ArrowUpDown className="w-3 h-3 opacity-30" />}
-                        </span>
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 w-20"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50 dark:divide-navy-800">
-                  {paginatedItems.map(item => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-navy-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="font-mono font-bold text-azure-600 dark:text-azure-400 text-xs">{item.project_code}</div>
-                        <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{item.project_name}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-white max-w-[300px] truncate" title={item.task_name}>{item.task_name}</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">{item.assigned_to}</span>
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${priorityColors[item.priority] || priorityColors['Orta']}`}>{item.priority}</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{item.category}</td>
-                      <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{formatDate(item.updated_at)}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg hover:bg-azure-50 dark:hover:bg-azure-500/10 text-gray-400 hover:text-azure-500 transition-colors">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {/* Row 2: Column headers + week numbers */}
+            <tr className="bg-gray-50 dark:bg-navy-800/80">
+              <th className="sticky left-0 z-40 bg-gray-50 dark:bg-navy-800 px-2 py-1.5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-navy-700 uppercase tracking-wider" style={{ minWidth: '80px' }}>Proje</th>
+              <th className="sticky z-40 bg-gray-50 dark:bg-navy-800 px-2 py-1.5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-navy-700 uppercase tracking-wider" style={{ left: '80px', minWidth: '190px' }}>Çalışmanın Adı</th>
+              <th className="sticky z-40 bg-gray-50 dark:bg-navy-800 px-2 py-1.5 text-left text-[10px] font-bold text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-navy-700 uppercase tracking-wider" style={{ left: '270px', minWidth: '80px' }}>Kişi</th>
+              <th className="sticky z-40 bg-gray-50 dark:bg-navy-800 px-1 py-1.5 text-center text-[10px] font-bold text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-navy-700 uppercase tracking-wider" style={{ left: '350px', minWidth: '45px' }}>Durum</th>
+              <th className="sticky z-40 bg-gray-50 dark:bg-navy-800 px-1 py-1.5 text-center text-[10px] font-bold text-gray-500 dark:text-gray-400 border-b border-r border-gray-200 dark:border-navy-700 uppercase tracking-wider" style={{ left: '395px', minWidth: '70px' }}>Toplam</th>
+              {weeks.map(w => (
+                <th
+                  key={w.week}
+                  ref={w.isCurrent ? currentWeekRef : undefined}
+                  className={`px-0.5 py-1 text-center border-b border-r whitespace-nowrap ${
+                    w.isCurrent
+                      ? 'bg-red-500 text-white border-red-400 font-black'
+                      : `${MONTH_CELL_COLORS[w.month]} text-gray-500 dark:text-gray-400 border-gray-200 dark:border-navy-700 font-bold`
+                  }`}
+                  style={{ minWidth: '46px' }}
+                >
+                  <div className="text-[10px]">W{w.week}</div>
+                  <div className="text-[8px] opacity-70 font-normal">{w.monday.getDate()}.{MONTHS_SHORT[w.monday.getMonth()]}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-navy-700">
-                <span className="text-xs text-gray-500 dark:text-gray-400">Sayfa {page} / {totalPages}</span>
-                <div className="flex gap-1">
-                  <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 disabled:opacity-30 transition-colors">
-                    <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-                  <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-800 disabled:opacity-30 transition-colors">
-                    <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          <tbody>
+            {filteredItems.map((item, idx) => {
+              const rowBg = idx % 2 === 0
+                ? 'bg-white dark:bg-navy-900'
+                : 'bg-gray-50/70 dark:bg-navy-800/20';
+              const stickyBg = idx % 2 === 0
+                ? 'bg-white dark:bg-navy-900'
+                : 'bg-gray-50 dark:bg-navy-850';
 
-      {/* PERSON REPORT TAB */}
-      {tab === 'person' && summary && (
-        <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <select value={reportPerson} onChange={e => setReportPerson(e.target.value)} className="px-4 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-              <option value="all">Tüm Kişiler</option>
-              {filters.people.filter(p => p !== 'Atanmamış').map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-            {reportPerson !== 'all' && (
-              <>
-              <button
-                onClick={() => {
-                  const pw = summary.personWorkload.find(p => p.assigned_to === reportPerson);
-                  if (pw) generatePersonExcel(reportPerson, items.filter(i => i.assigned_to === reportPerson), pw);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-emerald-600 dark:text-emerald-400 rounded-xl font-bold text-sm transition-all active:scale-[0.98]"
-              >
-                <FileSpreadsheet className="w-4 h-4" /> Excel
-              </button>
-              <button
-                onClick={() => {
-                  const pw = summary.personWorkload.find(p => p.assigned_to === reportPerson);
-                  if (pw) generatePersonReport(reportPerson, items.filter(i => i.assigned_to === reportPerson), pw);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-red-600 dark:text-red-400 rounded-xl font-bold text-sm transition-all active:scale-[0.98]"
-              >
-                <Download className="w-4 h-4" /> PDF
-              </button>
-              </>
-            )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {personReportData.map(p => {
-              const completionRate = p.total ? Math.round((p.completed / p.total) * 100) : 0;
               return (
-                <div key={p.assigned_to} onClick={() => setReportPerson(prev => prev === p.assigned_to ? 'all' : p.assigned_to)} className={`bg-white dark:bg-navy-900 rounded-2xl p-5 shadow-lg border-2 transition-all hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${reportPerson === p.assigned_to ? 'border-azure-500 dark:border-azure-400 ring-2 ring-azure-200 dark:ring-azure-500/30' : 'border-gray-100 dark:border-navy-800'}`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-azure-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                      {p.assigned_to.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 dark:text-white">{p.assigned_to}</h4>
-                      <p className="text-xs text-gray-400 dark:text-gray-500">{p.total} iş kalemi</p>
-                    </div>
-                  </div>
+                <tr key={item.id} className={`${rowBg} hover:bg-azure-50/40 dark:hover:bg-azure-500/5 transition-colors`}>
+                  {/* Proje */}
+                  <td
+                    className={`sticky left-0 z-10 ${stickyBg} px-2 py-1 border-b border-r border-gray-100 dark:border-navy-800 cursor-pointer group/cell`}
+                    onClick={() => openEdit(item)}
+                    style={{ minWidth: '80px' }}
+                  >
+                    <div className="font-mono font-bold text-azure-600 dark:text-azure-400 text-[10px] group-hover/cell:underline">{item.project_code}</div>
+                    <div className="text-[8px] text-gray-400 dark:text-gray-600 truncate max-w-[72px]">{item.project_name}</div>
+                  </td>
 
-                  <div className="h-3 rounded-full overflow-hidden flex bg-gray-100 dark:bg-navy-800 mb-3">
-                    <div className="bg-emerald-500" style={{ width: `${(p.completed / Math.max(p.total, 1)) * 100}%` }} />
-                    <div className="bg-blue-500" style={{ width: `${(p.active / Math.max(p.total, 1)) * 100}%` }} />
-                    <div className="bg-gray-300 dark:bg-gray-600" style={{ width: `${(p.not_started / Math.max(p.total, 1)) * 100}%` }} />
-                  </div>
+                  {/* Çalışmanın Adı */}
+                  <td
+                    className={`sticky z-10 ${stickyBg} px-2 py-1 border-b border-r border-gray-100 dark:border-navy-800 cursor-pointer`}
+                    style={{ left: '80px', minWidth: '190px' }}
+                    onClick={() => openEdit(item)}
+                  >
+                    <div className="font-medium text-gray-800 dark:text-gray-200 text-[11px] truncate max-w-[180px]" title={item.task_name}>
+                      {item.task_name}
+                    </div>
+                  </td>
 
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl py-2">
-                      <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{p.completed}</p>
-                      <p className="text-[10px] font-semibold text-emerald-500">Tamamlanan</p>
-                    </div>
-                    <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl py-2">
-                      <p className="text-lg font-black text-blue-600 dark:text-blue-400">{p.active}</p>
-                      <p className="text-[10px] font-semibold text-blue-500">Devam Eden</p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-500/10 rounded-xl py-2">
-                      <p className="text-lg font-black text-gray-500 dark:text-gray-400">{p.not_started}</p>
-                      <p className="text-[10px] font-semibold text-gray-400">Bekleyen</p>
-                    </div>
-                  </div>
+                  {/* Kişi */}
+                  <td
+                    className={`sticky z-10 ${stickyBg} px-2 py-1 border-b border-r border-gray-100 dark:border-navy-800`}
+                    style={{ left: '270px', minWidth: '80px' }}
+                  >
+                    <span className="font-semibold text-gray-700 dark:text-gray-300 text-[11px]">{item.assigned_to}</span>
+                  </td>
 
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tamamlanma</span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); generatePersonExcel(p.assigned_to, items.filter(i => i.assigned_to === p.assigned_to), p); }}
-                        className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-500/10 text-gray-400 hover:text-emerald-500 transition-colors"
-                        title="Excel İndir"
+                  {/* Durum */}
+                  <td
+                    className={`sticky z-10 ${stickyBg} px-1 py-1 border-b border-r border-gray-100 dark:border-navy-800 text-center`}
+                    style={{ left: '350px', minWidth: '45px' }}
+                  >
+                    <div className={`w-3 h-3 rounded-full mx-auto ${STATUS_DOTS[item.status] || 'bg-gray-400'}`} title={item.status} />
+                  </td>
+
+                  {/* Toplam */}
+                  <td
+                    className={`sticky z-10 ${stickyBg} px-1 py-1 border-b border-r border-gray-100 dark:border-navy-800 text-center`}
+                    style={{ left: '395px', minWidth: '70px' }}
+                  >
+                    {itemTotals[item.id] ? (
+                      <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">{itemTotals[item.id]}</span>
+                    ) : null}
+                  </td>
+
+                  {/* Week cells */}
+                  {weeks.map(w => {
+                    const key = `${item.id}_${w.week}`;
+                    const hours = logs[key];
+                    const isEditing = editCell === key;
+
+                    return (
+                      <td
+                        key={w.week}
+                        className={`px-0 py-0 border-b border-r text-center cursor-pointer transition-colors ${
+                          w.isCurrent
+                            ? 'bg-red-50/70 dark:bg-red-500/10 border-red-100 dark:border-red-900/30'
+                            : `${MONTH_CELL_COLORS[w.month]} border-gray-100 dark:border-navy-800`
+                        } ${!isEditing && !hours ? 'hover:bg-azure-100/60 dark:hover:bg-azure-500/10' : ''}`}
+                        style={{ minWidth: '46px' }}
+                        onClick={() => !isEditing && handleCellClick(item.id, w.week)}
                       >
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); generatePersonReport(p.assigned_to, items.filter(i => i.assigned_to === p.assigned_to), p); }}
-                        className="p-1.5 rounded-lg hover:bg-azure-50 dark:hover:bg-azure-500/10 text-gray-400 hover:text-azure-500 transition-colors"
-                        title="PDF İndir"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </button>
-                      <span className={`text-sm font-black ${completionRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : completionRate >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
-                        %{completionRate}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                        {isEditing ? (
+                          <input
+                            ref={inputRef}
+                            type="number"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => handleCellKeyDown(e, item.id, w.week)}
+                            onBlur={() => handleCellBlur(item.id, w.week)}
+                            className="w-full h-8 px-1 text-center text-xs font-bold bg-white dark:bg-navy-800 border-2 border-azure-500 outline-none text-gray-900 dark:text-white"
+                            min="0"
+                            step="1"
+                          />
+                        ) : hours ? (
+                          <div className="h-8 flex items-center justify-center">
+                            <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200">{hours}</span>
+                          </div>
+                        ) : (
+                          <div className="h-8" />
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
               );
             })}
+
+            {/* Total row */}
+            <tr className="sticky bottom-0 z-20 bg-[#1a202c] dark:bg-navy-950">
+              <td colSpan={4} className="sticky left-0 z-30 bg-[#1a202c] dark:bg-navy-950 px-3 py-2 text-white font-bold text-xs border-t border-r border-[#2d3748]" style={{ minWidth: '350px' }}>
+                TOPLAM
+              </td>
+              <td className="sticky z-30 bg-[#1a202c] dark:bg-navy-950 px-1 py-2 text-center text-white font-bold text-xs border-t border-r border-[#2d3748]" style={{ left: '395px', minWidth: '70px' }}>
+                {grandTotal || ''}
+              </td>
+              {weeks.map(w => (
+                <td
+                  key={w.week}
+                  className={`px-0.5 py-2 text-center font-bold text-xs border-t border-r ${
+                    w.isCurrent
+                      ? 'bg-red-700 text-white border-red-600'
+                      : 'bg-[#2d3748] dark:bg-navy-900 text-gray-200 border-[#374151]'
+                  }`}
+                  style={{ minWidth: '46px' }}
+                >
+                  {weekTotals[w.week] || ''}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mt-2 text-[10px]">
+        {Object.entries(STATUS_DOTS).map(([status, color]) => (
+          <div key={status} className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+            <div className={`w-2 h-2 rounded-full ${color}`} /> {status}
           </div>
-
-          {/* Person task list */}
-          {reportPerson !== 'all' && (
-            <div className="bg-white dark:bg-navy-900 rounded-2xl p-6 shadow-lg border border-gray-100 dark:border-navy-800">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">{reportPerson} — İş Detayları</h3>
-              <div className="space-y-2">
-                {items.filter(i => i.assigned_to === reportPerson).map(item => (
-                  <div key={item.id} className="flex items-center justify-between py-2.5 px-4 rounded-xl bg-gray-50 dark:bg-navy-800/50 hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-xs font-mono font-bold text-azure-600 dark:text-azure-400 flex-shrink-0">{item.project_code}</span>
-                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.task_name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                      <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">{item.category}</span>
-                      <StatusBadge status={item.status} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        ))}
+        <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400 ml-2">
+          <div className="w-2 h-2 rounded-full bg-red-500" /> Bu hafta
         </div>
-      )}
+        <span className="text-gray-400 dark:text-gray-600 ml-auto">Hücreye tıklayarak saat girebilirsiniz</span>
+      </div>
 
-      {/* PROJECT REPORT TAB */}
-      {tab === 'reports' && summary && (
-        <div className="space-y-6">
-          {summary.projectDistribution.map(proj => {
-            const projectItems = items.filter(i => i.project_code === proj.project_code && i.project_name === proj.project_name);
-            const completionRate = proj.total ? Math.round((proj.completed / proj.total) * 100) : 0;
-
-            return (
-              <div key={proj.project_code + proj.project_name} className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 overflow-hidden">
-                {/* Project Header */}
-                <div className="bg-gradient-to-r from-azure-500 to-blue-600 px-6 py-4 flex items-center justify-between">
-                  <div>
-                    <span className="text-white/70 text-xs font-mono font-bold">{proj.project_code}</span>
-                    <h3 className="text-lg font-bold text-white">{proj.project_name}</h3>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-white/70 text-xs">Tamamlanma</p>
-                      <p className="text-2xl font-black text-white">%{completionRate}</p>
-                    </div>
-                    <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                      <span className="text-2xl font-black text-white">{proj.total}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <div className="h-2 flex">
-                  <div className="bg-emerald-500 transition-all" style={{ width: `${completionRate}%` }} />
-                  <div className="bg-blue-400 transition-all" style={{ width: `${proj.total ? (proj.active / proj.total) * 100 : 0}%` }} />
-                  <div className="bg-gray-200 dark:bg-navy-700 flex-1" />
-                </div>
-
-                {/* Task list */}
-                <div className="p-4">
-                  <div className="space-y-1.5">
-                    {projectItems.map(item => (
-                      <div key={item.id} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-gray-50 dark:hover:bg-navy-800/50 transition-colors">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.task_name}</span>
-                        </div>
-                        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{item.assigned_to}</span>
-                          <StatusBadge status={item.status} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Edit/Add Modal */}
-      {(editItem || showAdd) && (
+      {/* =================== ADD/EDIT MODAL =================== */}
+      {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white dark:bg-navy-900 rounded-3xl p-6 w-full max-w-lg mx-4 shadow-2xl animate-scale-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {editItem ? 'İş Düzenle' : 'Yeni İş Ekle'}
               </h3>
-              <button onClick={() => { setEditItem(null); setShowAdd(false); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors">
+              <button onClick={() => { setShowModal(false); setEditItem(null); }} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
@@ -783,57 +684,32 @@ export default function WorkTrackingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">İş Adı</label>
+                <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Çalışmanın Adı</label>
                 <input value={form.task_name} onChange={e => setForm(f => ({ ...f, task_name: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400" placeholder="CFD Analiz" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Atanan Kişi</label>
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Çalışan Kişi</label>
                   <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
                     <option value="">Seçin</option>
-                    {filters.people.map(p => <option key={p} value={p}>{p}</option>)}
+                    {people.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Durum</label>
                   <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                    {filters.statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                    <option value="Başlanmadı">Başlanmadı</option>
+                    <option value="Devam Ediyor">Devam Ediyor</option>
+                    <option value="Tamamlandı">Tamamlandı</option>
+                    <option value="Data Bekleniyor">Data Bekleniyor</option>
                   </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Öncelik</label>
-                  <select value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                    <option value="Yüksek">Yüksek</option>
-                    <option value="Orta">Orta</option>
-                    <option value="Düşük">Düşük</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Kategori</label>
-                  <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                    {filters.categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Başlangıç</label>
-                  <input type="date" value={form.start_date} onChange={e => setForm(f => ({ ...f, start_date: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Hedef Tarih</label>
-                  <input type="date" value={form.target_date} onChange={e => setForm(f => ({ ...f, target_date: e.target.value }))} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1">Notlar</label>
-                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 resize-none" placeholder="Ek notlar..." />
+                <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="w-full px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 resize-none" />
               </div>
             </div>
 
@@ -844,10 +720,14 @@ export default function WorkTrackingPage() {
                 </button>
               )}
               <div className="flex-1" />
-              <button onClick={() => { setEditItem(null); setShowAdd(false); }} className="px-4 py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-colors">
+              <button onClick={() => { setShowModal(false); setEditItem(null); }} className="px-4 py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-colors">
                 İptal
               </button>
-              <button onClick={handleSave} disabled={saving || !form.task_name || !form.project_code} className="px-5 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center gap-1.5">
+              <button
+                onClick={handleSave}
+                disabled={saving || !form.task_name || !form.project_code}
+                className="px-5 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
+              >
                 <Save className="w-4 h-4" /> {saving ? '...' : editItem ? 'Güncelle' : 'Kaydet'}
               </button>
             </div>
