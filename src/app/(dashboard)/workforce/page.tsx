@@ -158,8 +158,13 @@ export default function WorkforcePage() {
   const [filterType, setFilterType] = useState('all');
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Pending changes: key = `${rowIndex}_${week}` -> value (1 or 0)
+  const [pendingChanges, setPendingChanges] = useState<Record<string, { rowIndex: number; week: number; value: number }>>({});
   // Cell popup for person/project view: { rowName, week, x, y }
   const [cellPopup, setCellPopup] = useState<{ rowName: string; week: number; x: number; y: number } | null>(null);
+
+  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+  const pendingCount = Object.keys(pendingChanges).length;
 
   const currentWeekRef = useRef<HTMLTableCellElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -265,12 +270,13 @@ export default function WorkforcePage() {
     }
   }, [cellPopup]);
 
-  // Toggle a single task/week allocation and save to Excel
-  async function toggleTaskWeek(task: WorkforceTask, week: number) {
+  // Toggle a single task/week allocation locally (pending)
+  function toggleTaskWeek(task: WorkforceTask, week: number) {
     const hasWork = task.weeks[week];
     const newValue = hasWork ? 0 : 1;
+    const key = `${task.rowIndex}_${week}`;
 
-    // Optimistic update
+    // Update local task state immediately
     setTasks(prev => prev.map(t => {
       if (t.rowIndex !== task.rowIndex) return t;
       const newWeeks = { ...t.weeks };
@@ -282,28 +288,60 @@ export default function WorkforcePage() {
       return { ...t, weeks: newWeeks };
     }));
 
+    // Track in pending changes
+    setPendingChanges(prev => {
+      const next = { ...prev };
+      next[key] = { rowIndex: task.rowIndex, week, value: newValue };
+      return next;
+    });
+  }
+
+  // Save all pending changes to DB
+  async function saveChanges() {
+    if (!hasPendingChanges) return;
+
     setSaving(true);
     try {
+      const updates = Object.values(pendingChanges);
       const res = await fetch('/api/workforce', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates: [{ rowIndex: task.rowIndex, week, value: newValue }] }),
+        body: JSON.stringify({ updates }),
       });
       if (!res.ok) throw new Error('Save failed');
       const data = await res.json();
       setTasks(data.tasks);
       setPeople(data.people);
       setProjects(data.projects);
+      setPendingChanges({});
     } catch {
-      // Revert on error — refetch
+      // Revert — refetch original
       fetch('/api/workforce').then(r => r.json()).then(data => {
         setTasks(data.tasks);
         setPeople(data.people);
         setProjects(data.projects);
       }).catch(() => {});
+      setPendingChanges({});
     } finally {
       setSaving(false);
     }
+  }
+
+  // Discard all pending changes
+  function discardChanges() {
+    setPendingChanges({});
+    setLoading(true);
+    fetch('/api/workforce')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setTasks(data.tasks);
+          setPeople(data.people);
+          setProjects(data.projects);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }
 
   // Open cell popup for person/project views
@@ -698,11 +736,48 @@ export default function WorkforcePage() {
         </div>
       )}
 
-      {/* Saving Indicator */}
-      {saving && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-azure-600 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold animate-fade-in">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Kaydediliyor...
+      {/* Save Changes Bar */}
+      {hasPendingChanges && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 animate-fade-in">
+          <div className="max-w-3xl mx-auto px-4 pb-5">
+            <div className="flex items-center justify-between gap-4 bg-navy-900 dark:bg-navy-950 text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-navy-700">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center">
+                  <span className="text-sm font-extrabold">{pendingCount}</span>
+                </div>
+                <div>
+                  <div className="text-sm font-bold">Kaydedilmemiş Değişiklik</div>
+                  <div className="text-[10px] text-gray-400">{pendingCount} hücre değiştirildi</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={discardChanges}
+                  disabled={saving}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={saveChanges}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-5 py-2 text-xs font-bold rounded-xl bg-emerald-500 hover:bg-emerald-400 transition-colors disabled:opacity-50 shadow-lg"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Kaydediliyor...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Değişiklikleri Kaydet
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

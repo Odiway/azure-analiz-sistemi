@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { getSQL } from '@/lib/db';
 import * as XLSX from 'xlsx';
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const EXCEL_FILE = join(process.cwd(), 'Analiz_İş_Gücü_Planı_X+3_170226.xlsx');
 
 interface WorkforceTask {
-  rowIndex: number; // Excel row index (0-based)
+  rowIndex: number;
   number: string;
   name: string;
   type: string;
@@ -21,7 +22,7 @@ interface WorkforceTask {
   status: string;
   phase3: string;
   cadReady: string;
-  weeks: Record<number, number>; // week number -> allocation (1 = full)
+  weeks: Record<number, number>;
 }
 
 interface PersonSummary {
@@ -29,26 +30,17 @@ interface PersonSummary {
   tasks: number;
   projects: string[];
   totalWeekAllocations: number;
-  weeklyLoad: Record<number, number>; // week -> total tasks that week
+  weeklyLoad: Record<number, number>;
 }
 
-function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projects: string[] } {
+function parseExcelBase(): WorkforceTask[] {
   const fileBuffer = readFileSync(EXCEL_FILE);
   const wb = XLSX.read(fileBuffer, { type: 'buffer' });
   const ws = wb.Sheets['Project Plan and Timing'];
-
   if (!ws) throw new Error('Sheet not found');
 
   const data: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-
   const tasks: WorkforceTask[] = [];
-  const validCAE = new Set<string>();
-  const projectSet = new Set<string>();
-
-  // Data rows start from row 9 (0-indexed)
-  // Columns: 1=Number, 3=Name, 4=Type, 5=Ekip, 6=Sorumlu, 7=Status, 8=Phase3,
-  //          10=Project, 11=CAE Resp, 12=CAD Readiness
-  // Week columns: 13-64 = weeks 1-52 of first year (2026)
 
   for (let i = 9; i < data.length; i++) {
     const r = data[i];
@@ -80,13 +72,45 @@ function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projec
       cadReady: String(r[12] || '').trim(),
       weeks,
     });
-
-    validCAE.add(cae);
-    if (prj) projectSet.add(prj);
   }
 
-  // Build per-person summary
+  return tasks;
+}
+
+async function applyOverrides(tasks: WorkforceTask[]): Promise<WorkforceTask[]> {
+  const sql = getSQL();
+  const rows = await sql('SELECT row_index, week, value FROM workforce_overrides');
+  const overrides = rows as { row_index: number; week: number; value: number }[];
+
+  if (overrides.length === 0) return tasks;
+
+  // Build a map: rowIndex -> { week -> value }
+  const overrideMap: Record<number, Record<number, number>> = {};
+  for (const o of overrides) {
+    if (!overrideMap[o.row_index]) overrideMap[o.row_index] = {};
+    overrideMap[o.row_index][o.week] = o.value;
+  }
+
+  return tasks.map(task => {
+    const rowOverrides = overrideMap[task.rowIndex];
+    if (!rowOverrides) return task;
+
+    const newWeeks = { ...task.weeks };
+    for (const [wk, val] of Object.entries(rowOverrides)) {
+      const w = parseInt(wk);
+      if (val > 0) {
+        newWeeks[w] = val;
+      } else {
+        delete newWeeks[w];
+      }
+    }
+    return { ...task, weeks: newWeeks };
+  });
+}
+
+function buildSummary(tasks: WorkforceTask[]): { people: PersonSummary[]; projects: string[] } {
   const personMap: Record<string, { tasks: number; projects: Set<string>; totalWeeks: number; weeklyLoad: Record<number, number> }> = {};
+  const projectSet = new Set<string>();
 
   for (const task of tasks) {
     const p = task.caeResp;
@@ -101,6 +125,8 @@ function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projec
       const weekNum = parseInt(wk);
       personMap[p].weeklyLoad[weekNum] = (personMap[p].weeklyLoad[weekNum] || 0) + val;
     }
+
+    if (task.project) projectSet.add(task.project);
   }
 
   const people: PersonSummary[] = Object.entries(personMap)
@@ -113,7 +139,7 @@ function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projec
     }))
     .sort((a, b) => b.tasks - a.tasks);
 
-  return { tasks, people, projects: Array.from(projectSet) };
+  return { people, projects: Array.from(projectSet) };
 }
 
 export async function GET() {
@@ -121,8 +147,10 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const data = parseExcel();
-    return NextResponse.json(data);
+    const baseTasks = parseExcelBase();
+    const tasks = await applyOverrides(baseTasks);
+    const { people, projects } = buildSummary(tasks);
+    return NextResponse.json({ tasks, people, projects });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Excel parse error' }, { status: 500 });
   }
@@ -140,7 +168,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
     }
 
-    // Validate all updates
     for (const u of updates) {
       if (typeof u.rowIndex !== 'number' || u.rowIndex < 9) {
         return NextResponse.json({ error: 'Invalid rowIndex' }, { status: 400 });
@@ -153,33 +180,30 @@ export async function POST(req: Request) {
       }
     }
 
-    const fileBuffer = readFileSync(EXCEL_FILE);
-    const wb = XLSX.read(fileBuffer, { type: 'buffer' });
-    const ws = wb.Sheets['Project Plan and Timing'];
-    if (!ws) return NextResponse.json({ error: 'Sheet not found' }, { status: 500 });
+    const sql = getSQL();
 
+    // Upsert all overrides
     for (const { rowIndex, week, value } of updates) {
-      const col = 12 + week; // week 1 -> col 13 (0-indexed)
-      const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: col });
-
       if (value > 0) {
-        ws[cellRef] = { t: 'n', v: value };
+        await sql(
+          `INSERT INTO workforce_overrides (row_index, week, value, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (row_index, week) DO UPDATE SET value = $3, updated_at = NOW()`,
+          [rowIndex, week, value]
+        );
       } else {
-        // Remove the cell (set to empty)
-        delete ws[cellRef];
+        await sql(
+          'DELETE FROM workforce_overrides WHERE row_index = $1 AND week = $2',
+          [rowIndex, week]
+        );
       }
     }
 
-    // Update sheet range if needed
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-    ws['!ref'] = XLSX.utils.encode_range(range);
-
-    const output = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    writeFileSync(EXCEL_FILE, output);
-
-    // Re-parse and return fresh data
-    const data = parseExcel();
-    return NextResponse.json(data);
+    // Return fresh data
+    const baseTasks = parseExcelBase();
+    const tasks = await applyOverrides(baseTasks);
+    const { people, projects } = buildSummary(tasks);
+    return NextResponse.json({ tasks, people, projects });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Update error' }, { status: 500 });
   }
