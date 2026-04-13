@@ -5,11 +5,12 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Filter, BarChart3,
   Calendar, Briefcase, Activity, Zap, Target, Clock,
-  Award, TrendingUp, X,
+  Award, TrendingUp, X, Check, Loader2,
 } from 'lucide-react';
 
 // ===================== TYPES =====================
 interface WorkforceTask {
+  rowIndex: number;
   number: string;
   name: string;
   type: string;
@@ -156,9 +157,13 @@ export default function WorkforcePage() {
   const [filterProject, setFilterProject] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Cell popup for person/project view: { rowName, week, x, y }
+  const [cellPopup, setCellPopup] = useState<{ rowName: string; week: number; x: number; y: number } | null>(null);
 
   const currentWeekRef = useRef<HTMLTableCellElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   const weeks = useMemo(() => getWeeksForYear(year), [year]);
   const monthGroups = useMemo(() => groupWeeksByMonth(weeks), [weeks]);
@@ -245,6 +250,75 @@ export default function WorkforcePage() {
     if (currentWeekRef.current) {
       currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
+  }
+
+  // Close popup on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setCellPopup(null);
+      }
+    }
+    if (cellPopup) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [cellPopup]);
+
+  // Toggle a single task/week allocation and save to Excel
+  async function toggleTaskWeek(task: WorkforceTask, week: number) {
+    const hasWork = task.weeks[week];
+    const newValue = hasWork ? 0 : 1;
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => {
+      if (t.rowIndex !== task.rowIndex) return t;
+      const newWeeks = { ...t.weeks };
+      if (newValue > 0) {
+        newWeeks[week] = newValue;
+      } else {
+        delete newWeeks[week];
+      }
+      return { ...t, weeks: newWeeks };
+    }));
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/workforce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates: [{ rowIndex: task.rowIndex, week, value: newValue }] }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      const data = await res.json();
+      setTasks(data.tasks);
+      setPeople(data.people);
+      setProjects(data.projects);
+    } catch {
+      // Revert on error — refetch
+      fetch('/api/workforce').then(r => r.json()).then(data => {
+        setTasks(data.tasks);
+        setPeople(data.people);
+        setProjects(data.projects);
+      }).catch(() => {});
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Open cell popup for person/project views
+  function handleCellPopup(e: React.MouseEvent, rowName: string, week: number) {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setCellPopup({ rowName, week, x: rect.left, y: rect.bottom + 4 });
+  }
+
+  // Get tasks for a specific person/project and week
+  function getPopupTasks(): WorkforceTask[] {
+    if (!cellPopup) return [];
+    if (viewMode === 'person') {
+      return filteredTasks.filter(t => t.caeResp === cellPopup.rowName);
+    }
+    return filteredTasks.filter(t => t.project === cellPopup.rowName);
   }
 
   // Get heat color for load
@@ -483,9 +557,11 @@ export default function WorkforcePage() {
                         return (
                           <td
                             key={w.week}
-                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] relative
-                              ${w.isCurrent ? 'bg-azure-50/70 dark:bg-azure-500/10 border-x border-azure-200 dark:border-azure-700' : ''}`}
-                            title={wd ? `W${w.week}: ${load} analiz\n${wd.tasks.map(t => `• ${t.name} (${t.project})`).join('\n')}` : ''}
+                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] relative cursor-pointer
+                              ${w.isCurrent ? 'bg-azure-50/70 dark:bg-azure-500/10 border-x border-azure-200 dark:border-azure-700' : ''}
+                              ${load === 0 ? 'hover:bg-gray-100 dark:hover:bg-navy-700' : 'hover:opacity-75'}`}
+                            title={wd ? `W${w.week}: ${load} analiz — düzenlemek için tıkla` : `W${w.week} — eklemek için tıkla`}
+                            onClick={(e) => handleCellPopup(e, rowName, w.week)}
                           >
                             {load > 0 && (
                               <div className={`mx-auto w-full h-full min-h-[24px] flex items-center justify-center ${getLoadColor(load)}`}>
@@ -597,12 +673,15 @@ export default function WorkforcePage() {
                         return (
                           <td
                             key={w.week}
-                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px]
-                              ${w.isCurrent ? 'border-x border-azure-200 dark:border-azure-700' : ''}`}
+                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] cursor-pointer
+                              ${w.isCurrent ? 'border-x border-azure-200 dark:border-azure-700' : ''}
+                              ${!hasWork ? 'hover:bg-gray-100 dark:hover:bg-navy-700' : 'hover:opacity-60'}`}
+                            onClick={() => toggleTaskWeek(task, w.week)}
+                            title={hasWork ? `${task.name} - W${w.week} (kaldırmak için tıkla)` : `W${w.week} (eklemek için tıkla)`}
                           >
                             {hasWork ? (
                               <div
-                                className="w-full h-[20px] opacity-80"
+                                className="w-full h-[20px] opacity-80 transition-all"
                                 style={{ backgroundColor: projColor }}
                                 title={`${task.name} - W${w.week}`}
                               />
@@ -618,6 +697,80 @@ export default function WorkforcePage() {
           </div>
         </div>
       )}
+
+      {/* Saving Indicator */}
+      {saving && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-azure-600 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-bold animate-fade-in">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Kaydediliyor...
+        </div>
+      )}
+
+      {/* Cell Popup for Person/Project views */}
+      {cellPopup && viewMode !== 'gantt' && (() => {
+        const popupTasks = getPopupTasks();
+        const week = cellPopup.week;
+        // Position popup, make sure it doesn't go off screen
+        const left = Math.min(cellPopup.x, window.innerWidth - 320);
+        const top = Math.min(cellPopup.y, window.innerHeight - 300);
+
+        return (
+          <div
+            ref={popupRef}
+            className="fixed z-50 bg-white dark:bg-navy-900 rounded-xl shadow-2xl border border-gray-200 dark:border-navy-700 w-[300px] max-h-[320px] overflow-hidden animate-fade-in"
+            style={{ left: `${left}px`, top: `${top}px` }}
+          >
+            {/* Popup Header */}
+            <div className="flex items-center justify-between px-3 py-2 bg-navy-900 dark:bg-navy-950 text-white rounded-t-xl">
+              <div>
+                <div className="font-bold text-xs">{cellPopup.rowName}</div>
+                <div className="text-[9px] text-gray-300">Hafta {week} — {viewMode === 'person' ? 'Analizler' : 'Görevler'}</div>
+              </div>
+              <button onClick={() => setCellPopup(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Task list with toggles */}
+            <div className="overflow-y-auto max-h-[260px] p-2 space-y-1">
+              {popupTasks.length === 0 ? (
+                <div className="text-center py-4 text-xs text-gray-400">Bu {viewMode === 'person' ? 'kişi' : 'proje'} için analiz bulunamadı</div>
+              ) : (
+                popupTasks.map((task, i) => {
+                  const isActive = !!task.weeks[week];
+                  const projColor = PROJECT_DOT_COLORS[task.project] || '#6B7280';
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleTaskWeek(task, week)}
+                      className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition-all ${
+                        isActive
+                          ? 'bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800'
+                          : 'bg-gray-50 dark:bg-navy-800/50 border border-gray-100 dark:border-navy-700 hover:bg-gray-100 dark:hover:bg-navy-700'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all ${
+                        isActive
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-gray-200 dark:bg-navy-600'
+                      }`}>
+                        {isActive && <Check className="w-3 h-3" />}
+                      </div>
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: projColor }} />
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-bold text-[10px] truncate ${isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {task.name}
+                        </div>
+                        <div className="text-[8px] text-gray-400 truncate">{task.project} · {task.caeResp}</div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Person Detail Panel */}
       {selectedPerson && viewMode === 'person' && (

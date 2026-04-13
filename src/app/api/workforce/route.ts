@@ -2,12 +2,15 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import * as XLSX from 'xlsx';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 export const dynamic = 'force-dynamic';
 
+const EXCEL_FILE = join(process.cwd(), 'Analiz_İş_Gücü_Planı_X+3_170226.xlsx');
+
 interface WorkforceTask {
+  rowIndex: number; // Excel row index (0-based)
   number: string;
   name: string;
   type: string;
@@ -30,8 +33,7 @@ interface PersonSummary {
 }
 
 function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projects: string[] } {
-  const filePath = join(process.cwd(), 'Analiz_İş_Gücü_Planı_X+3_170226.xlsx');
-  const fileBuffer = readFileSync(filePath);
+  const fileBuffer = readFileSync(EXCEL_FILE);
   const wb = XLSX.read(fileBuffer, { type: 'buffer' });
   const ws = wb.Sheets['Project Plan and Timing'];
 
@@ -65,6 +67,7 @@ function parseExcel(): { tasks: WorkforceTask[]; people: PersonSummary[]; projec
     }
 
     tasks.push({
+      rowIndex: i,
       number: String(r[1] || '').trim(),
       name,
       type: String(r[4] || '').trim(),
@@ -122,5 +125,62 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Excel parse error' }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  try {
+    const body = await req.json();
+    const updates: { rowIndex: number; week: number; value: number }[] = body.updates;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
+    }
+
+    // Validate all updates
+    for (const u of updates) {
+      if (typeof u.rowIndex !== 'number' || u.rowIndex < 9) {
+        return NextResponse.json({ error: 'Invalid rowIndex' }, { status: 400 });
+      }
+      if (typeof u.week !== 'number' || u.week < 1 || u.week > 52) {
+        return NextResponse.json({ error: 'Invalid week' }, { status: 400 });
+      }
+      if (typeof u.value !== 'number' || u.value < 0) {
+        return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
+      }
+    }
+
+    const fileBuffer = readFileSync(EXCEL_FILE);
+    const wb = XLSX.read(fileBuffer, { type: 'buffer' });
+    const ws = wb.Sheets['Project Plan and Timing'];
+    if (!ws) return NextResponse.json({ error: 'Sheet not found' }, { status: 500 });
+
+    for (const { rowIndex, week, value } of updates) {
+      const col = 12 + week; // week 1 -> col 13 (0-indexed)
+      const cellRef = XLSX.utils.encode_cell({ r: rowIndex, c: col });
+
+      if (value > 0) {
+        ws[cellRef] = { t: 'n', v: value };
+      } else {
+        // Remove the cell (set to empty)
+        delete ws[cellRef];
+      }
+    }
+
+    // Update sheet range if needed
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    ws['!ref'] = XLSX.utils.encode_range(range);
+
+    const output = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    writeFileSync(EXCEL_FILE, output);
+
+    // Re-parse and return fresh data
+    const data = parseExcel();
+    return NextResponse.json(data);
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Update error' }, { status: 500 });
   }
 }
