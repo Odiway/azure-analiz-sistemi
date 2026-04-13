@@ -5,8 +5,9 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Briefcase, Search, Filter, ChevronDown, ChevronUp, Plus, X, Save, Trash2,
   BarChart3, Users, FolderKanban, Clock, CheckCircle, AlertCircle, Pause,
-  TrendingUp, ArrowUpDown, Pencil, Eye, ChevronLeft, ChevronRight,
+  TrendingUp, ArrowUpDown, Pencil, Eye, ChevronLeft, ChevronRight, Download,
 } from 'lucide-react';
+import { generateGeneralReport, generatePersonReport } from '@/lib/pdf-report';
 
 interface WorkItem {
   id: number;
@@ -251,9 +252,18 @@ export default function WorkTrackingPage() {
             CAE ekibi iş planı ve raporlama
           </p>
         </div>
-        <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30 active:scale-[0.98]">
-          <Plus className="w-4 h-4" /> Yeni İş Ekle
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => summary && generateGeneralReport(items, summary)}
+            disabled={!summary}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-40"
+          >
+            <Download className="w-4 h-4" /> Genel Rapor
+          </button>
+          <button onClick={openAdd} className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30 active:scale-[0.98]">
+            <Plus className="w-4 h-4" /> Yeni İş Ekle
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -537,6 +547,17 @@ export default function WorkTrackingPage() {
               <option value="all">Tüm Kişiler</option>
               {filters.people.filter(p => p !== 'Atanmamış').map(p => <option key={p} value={p}>{p}</option>)}
             </select>
+            {reportPerson !== 'all' && (
+              <button
+                onClick={() => {
+                  const pw = summary.personWorkload.find(p => p.assigned_to === reportPerson);
+                  if (pw) generatePersonReport(reportPerson, items.filter(i => i.assigned_to === reportPerson), pw);
+                }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-sm transition-all active:scale-[0.98]"
+              >
+                <Download className="w-4 h-4" /> Kişi Raporu İndir
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {personReportData.map(p => {
@@ -576,9 +597,18 @@ export default function WorkTrackingPage() {
 
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tamamlanma</span>
-                    <span className={`text-sm font-black ${completionRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : completionRate >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
-                      %{completionRate}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); generatePersonReport(p.assigned_to, items.filter(i => i.assigned_to === p.assigned_to), p); }}
+                        className="p-1.5 rounded-lg hover:bg-azure-50 dark:hover:bg-azure-500/10 text-gray-400 hover:text-azure-500 transition-colors"
+                        title="PDF İndir"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                      <span className={`text-sm font-black ${completionRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : completionRate >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500 dark:text-red-400'}`}>
+                        %{completionRate}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
