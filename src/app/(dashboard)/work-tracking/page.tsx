@@ -735,15 +735,15 @@ export default function WorkTrackingPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-1.5 mb-3">
-        <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+        <select value={filterPerson} onChange={e => setFilterPerson(e.target.value)} className="px-2.5 py-1.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-azure-400">
           <option value="all">Tüm Kişiler</option>
           {people.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
-        <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+        <select value={filterProject} onChange={e => setFilterProject(e.target.value)} className="px-2.5 py-1.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-azure-400">
           <option value="all">Tüm Projeler</option>
           {projects.map(p => <option key={p.project_code} value={p.project_code}>{p.project_code} - {p.project_name}</option>)}
         </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-2.5 py-1.5 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-2.5 py-1.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 rounded-lg text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-azure-400">
           <option value="all">Tüm Durumlar</option>
           {statuses.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -819,7 +819,7 @@ export default function WorkTrackingPage() {
                 : 'bg-gray-50/70 dark:bg-navy-800/20';
               const stickyBg = idx % 2 === 0
                 ? 'bg-white dark:bg-navy-900'
-                : 'bg-gray-50 dark:bg-navy-850';
+                : 'bg-gray-50 dark:bg-navy-900/80';
 
               return (
                 <tr key={item.id} className={`${rowBg} hover:bg-azure-50/40 dark:hover:bg-azure-500/5 transition-colors`}>
