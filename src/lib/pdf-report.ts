@@ -1,5 +1,6 @@
 ﻿import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ROBOTO_REGULAR, ROBOTO_BOLD } from './roboto-font';
 
 // TEMSA corporate colors
 const TEMSA_BLUE = [0, 82, 155] as const;      // #00529B
@@ -51,40 +52,10 @@ interface SummaryData {
 }
 
 // ===================== FONT LOADING =====================
-let fontCache: { regular: string; bold: string } | null = null;
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  const chunkSize = 8192;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    for (let j = 0; j < chunk.length; j++) {
-      binary += String.fromCharCode(chunk[j]);
-    }
-  }
-  return btoa(binary);
-}
-
-async function loadTurkishFonts(doc: jsPDF) {
-  if (!fontCache) {
-    const [regularRes, boldRes] = await Promise.all([
-      fetch('/fonts/Roboto-Regular.ttf'),
-      fetch('/fonts/Roboto-Bold.ttf'),
-    ]);
-    const [regularBuf, boldBuf] = await Promise.all([
-      regularRes.arrayBuffer(),
-      boldRes.arrayBuffer(),
-    ]);
-    fontCache = {
-      regular: arrayBufferToBase64(regularBuf),
-      bold: arrayBufferToBase64(boldBuf),
-    };
-  }
-
-  doc.addFileToVFS('Roboto-Regular.ttf', fontCache.regular);
+function loadTurkishFonts(doc: jsPDF) {
+  doc.addFileToVFS('Roboto-Regular.ttf', ROBOTO_REGULAR);
   doc.addFont('Roboto-Regular.ttf', FONT, 'normal');
-  doc.addFileToVFS('Roboto-Bold.ttf', fontCache.bold);
+  doc.addFileToVFS('Roboto-Bold.ttf', ROBOTO_BOLD);
   doc.addFont('Roboto-Bold.ttf', FONT, 'bold');
   doc.setFont(FONT);
 }
@@ -238,9 +209,9 @@ function drawProgressBar(doc: jsPDF, x: number, y: number, w: number, h: number,
 }
 
 // ===================== GENERAL REPORT =====================
-export async function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
+export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   const doc = new jsPDF('p', 'mm', 'a4');
-  await loadTurkishFonts(doc);
+  loadTurkishFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // PAGE 1: Overview
@@ -435,13 +406,13 @@ export async function generateGeneralReport(items: WorkItem[], summary: SummaryD
 }
 
 // ===================== PERSON REPORT =====================
-export async function generatePersonReport(
+export function generatePersonReport(
   personName: string,
   items: WorkItem[],
   workload: PersonWorkload,
 ) {
   const doc = new jsPDF('p', 'mm', 'a4');
-  await loadTurkishFonts(doc);
+  loadTurkishFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
 
   let startY = addCorporateHeader(doc, `Kişi Raporu: ${personName}`, 'Bireysel iş takip ve performans raporu');
