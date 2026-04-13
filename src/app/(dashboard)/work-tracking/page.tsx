@@ -4,7 +4,8 @@ import { useSession } from 'next-auth/react';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Briefcase, Plus, X, Save, Trash2, ChevronLeft, ChevronRight,
-  Download, FileSpreadsheet, Calendar,
+  Download, FileSpreadsheet, Calendar, FileText, Users, FolderKanban,
+  BarChart3, TrendingUp,
 } from 'lucide-react';
 
 // ===================== TYPES =====================
@@ -107,6 +108,11 @@ export default function WorkTrackingPage() {
   const [people, setPeople] = useState<string[]>([]);
   const [projects, setProjects] = useState<{ project_code: string; project_name: string }[]>([]);
 
+  // Analysis tab
+  const [analysisTab, setAnalysisTab] = useState<'none' | 'person' | 'project'>('none');
+  const [summary, setSummary] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   // Cell editing
   const [editCell, setEditCell] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -183,6 +189,18 @@ export default function WorkTrackingPage() {
   }, [year]);
 
   useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
+
+  // Fetch analysis summary when tab activated
+  useEffect(() => {
+    if (analysisTab !== 'none' && !summary) {
+      setSummaryLoading(true);
+      fetch('/api/work-items/reports?type=summary')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setSummary(data); })
+        .catch(() => {})
+        .finally(() => setSummaryLoading(false));
+    }
+  }, [analysisTab, summary]);
 
   // Scroll to current week on load
   useEffect(() => {
@@ -321,7 +339,8 @@ export default function WorkTrackingPage() {
 
   // ===================== EXCEL EXPORT =====================
   async function exportWeeklyExcel() {
-    const XLSX = (await import('xlsx')).default;
+    const xlsxModule = await import('xlsx');
+    const XLSX = xlsxModule.default || xlsxModule;
     const wb = XLSX.utils.book_new();
 
     // Sheet: Haftalık Plan
@@ -388,6 +407,39 @@ export default function WorkTrackingPage() {
     URL.revokeObjectURL(url);
   }
 
+  // ===================== PDF EXPORT =====================
+  async function downloadGeneralPDF() {
+    try {
+      const [itemsRes, summaryRes] = await Promise.all([
+        fetch('/api/work-items'),
+        fetch('/api/work-items/reports?type=summary'),
+      ]);
+      if (!itemsRes.ok || !summaryRes.ok) return;
+      const [allItems, summaryData] = await Promise.all([itemsRes.json(), summaryRes.json()]);
+      const { generateGeneralReport } = await import('@/lib/pdf-report');
+      generateGeneralReport(allItems, summaryData);
+    } catch (e) {
+      console.error('PDF Error:', e);
+    }
+  }
+
+  async function downloadPersonPDF(personName: string) {
+    try {
+      const [itemsRes, summaryRes] = await Promise.all([
+        fetch(`/api/work-items?assignedTo=${encodeURIComponent(personName)}`),
+        fetch('/api/work-items/reports?type=summary'),
+      ]);
+      if (!itemsRes.ok || !summaryRes.ok) return;
+      const [personItems, summaryData] = await Promise.all([itemsRes.json(), summaryRes.json()]);
+      const workload = summaryData.personWorkload?.find((p: any) => p.assigned_to === personName);
+      if (!workload) return;
+      const { generatePersonReport } = await import('@/lib/pdf-report');
+      generatePersonReport(personName, personItems, workload);
+    } catch (e) {
+      console.error('PDF Error:', e);
+    }
+  }
+
   // ===================== LOADING STATE =====================
   if (loading) {
     return (
@@ -432,6 +484,9 @@ export default function WorkTrackingPage() {
           </button>
           <button onClick={exportWeeklyExcel} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold transition-all">
             <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
+          </button>
+          <button onClick={downloadGeneralPDF} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all">
+            <FileText className="w-3.5 h-3.5" /> PDF
           </button>
           <button onClick={openAdd} className="flex items-center gap-1 px-2.5 py-2 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30">
             <Plus className="w-3.5 h-3.5" /> Yeni İş
@@ -657,6 +712,209 @@ export default function WorkTrackingPage() {
         </div>
         <span className="text-gray-400 dark:text-gray-600 ml-auto">Hücreye tıklayarak saat girebilirsiniz</span>
       </div>
+
+      {/* =================== ANALYSIS TABS =================== */}
+      <div className="flex gap-2 mt-4 mb-2">
+        <button
+          onClick={() => setAnalysisTab(analysisTab === 'person' ? 'none' : 'person')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+            analysisTab === 'person'
+              ? 'bg-azure-500 text-white shadow-lg shadow-azure-200/50 dark:shadow-azure-900/30'
+              : 'bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-navy-700'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" /> Kişi Bazlı Analiz
+        </button>
+        <button
+          onClick={() => setAnalysisTab(analysisTab === 'project' ? 'none' : 'project')}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+            analysisTab === 'project'
+              ? 'bg-azure-500 text-white shadow-lg shadow-azure-200/50 dark:shadow-azure-900/30'
+              : 'bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-navy-700'
+          }`}
+        >
+          <FolderKanban className="w-3.5 h-3.5" /> Proje Bazlı Analiz
+        </button>
+      </div>
+
+      {/* =================== PERSON ANALYSIS =================== */}
+      {analysisTab === 'person' && (
+        <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-4 mb-4 animate-fade-in">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-azure-500" />
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Kişi Bazlı İş Yükü Analizi</h2>
+          </div>
+
+          {summaryLoading ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+          ) : summary?.personWorkload ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+              {summary.personWorkload.map((person: any) => {
+                const completionRate = person.total ? Math.round((person.completed / person.total) * 100) : 0;
+                // Calculate weekly hours from logs for this person
+                const personItems = items.filter(i => i.assigned_to === person.assigned_to);
+                let personHours = 0;
+                for (const item of personItems) {
+                  for (const w of weeks) {
+                    personHours += logs[`${item.id}_${w.week}`] || 0;
+                  }
+                }
+
+                return (
+                  <div key={person.assigned_to} className="bg-gray-50 dark:bg-navy-800/50 rounded-xl p-4 border border-gray-100 dark:border-navy-700 hover:border-azure-300 dark:hover:border-azure-700 transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-bold text-sm text-gray-900 dark:text-white">{person.assigned_to}</h3>
+                      <button
+                        onClick={() => downloadPersonPDF(person.assigned_to)}
+                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-colors"
+                        title="PDF İndir"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Stats grid */}
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      <div className="text-center">
+                        <div className="text-lg font-extrabold text-gray-800 dark:text-gray-200">{person.total}</div>
+                        <div className="text-[9px] text-gray-400 font-medium">Toplam</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-extrabold text-blue-500">{person.active}</div>
+                        <div className="text-[9px] text-gray-400 font-medium">Devam</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-extrabold text-emerald-500">{person.completed}</div>
+                        <div className="text-[9px] text-gray-400 font-medium">Bitti</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-extrabold text-amber-500">{personHours}h</div>
+                        <div className="text-[9px] text-gray-400 font-medium">Saat</div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-2 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{ width: `${completionRate}%` }} />
+                    </div>
+                    <div className="text-right mt-1">
+                      <span className={`text-[10px] font-bold ${completionRate >= 70 ? 'text-emerald-500' : completionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                        %{completionRate} tamamlandı
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
+          )}
+        </div>
+      )}
+
+      {/* =================== PROJECT ANALYSIS =================== */}
+      {analysisTab === 'project' && (
+        <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-4 mb-4 animate-fade-in">
+          <div className="flex items-center gap-2 mb-4">
+            <FolderKanban className="w-5 h-5 text-azure-500" />
+            <h2 className="text-base font-bold text-gray-900 dark:text-white">Proje Bazlı Dağılım Analizi</h2>
+          </div>
+
+          {summaryLoading ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+          ) : summary?.projectDistribution ? (
+            <div className="space-y-3">
+              {/* Overview stat bar */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+                <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-3 text-center border border-blue-100 dark:border-blue-900/30">
+                  <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{summary.projectDistribution.length}</div>
+                  <div className="text-[10px] text-blue-500 font-bold">Toplam Proje</div>
+                </div>
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-3 text-center border border-emerald-100 dark:border-emerald-900/30">
+                  <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {summary.projectDistribution.reduce((s: number, p: any) => s + p.completed, 0)}
+                  </div>
+                  <div className="text-[10px] text-emerald-500 font-bold">Tamamlanan İş</div>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3 text-center border border-amber-100 dark:border-amber-900/30">
+                  <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">
+                    {summary.projectDistribution.reduce((s: number, p: any) => s + p.active, 0)}
+                  </div>
+                  <div className="text-[10px] text-amber-500 font-bold">Devam Eden</div>
+                </div>
+                <div className="bg-purple-50 dark:bg-purple-500/10 rounded-xl p-3 text-center border border-purple-100 dark:border-purple-900/30">
+                  <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">
+                    {summary.totalHours ? Number(summary.totalHours.total).toFixed(0) : 0}
+                  </div>
+                  <div className="text-[10px] text-purple-500 font-bold">Toplam Saat</div>
+                </div>
+              </div>
+
+              {/* Project cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {summary.projectDistribution.map((project: any) => {
+                  const completionRate = project.total ? Math.round((project.completed / project.total) * 100) : 0;
+                  // Calculate project hours from logs
+                  const projectItems = items.filter(i => i.project_code === project.project_code);
+                  let projectHours = 0;
+                  for (const item of projectItems) {
+                    for (const w of weeks) {
+                      projectHours += logs[`${item.id}_${w.week}`] || 0;
+                    }
+                  }
+
+                  return (
+                    <div key={project.project_code} className="bg-gray-50 dark:bg-navy-800/50 rounded-xl p-4 border border-gray-100 dark:border-navy-700">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <span className="font-mono font-extrabold text-azure-600 dark:text-azure-400 text-sm">{project.project_code}</span>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.project_name}</p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          completionRate >= 70 ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          : completionRate >= 40 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                          : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                        }`}>
+                          %{completionRate}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2 mb-3">
+                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
+                          <div className="text-sm font-bold text-gray-800 dark:text-gray-200">{project.total}</div>
+                          <div className="text-[8px] text-gray-400">Toplam</div>
+                        </div>
+                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
+                          <div className="text-sm font-bold text-blue-500">{project.active}</div>
+                          <div className="text-[8px] text-gray-400">Devam</div>
+                        </div>
+                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
+                          <div className="text-sm font-bold text-emerald-500">{project.completed}</div>
+                          <div className="text-[8px] text-gray-400">Bitti</div>
+                        </div>
+                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
+                          <div className="text-sm font-bold text-purple-500">{projectHours}h</div>
+                          <div className="text-[8px] text-gray-400">Saat</div>
+                        </div>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div className="w-full h-1.5 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{
+                          width: `${completionRate}%`,
+                          background: completionRate >= 70 ? 'linear-gradient(to right, #34d399, #10b981)' : completionRate >= 40 ? 'linear-gradient(to right, #fbbf24, #f59e0b)' : 'linear-gradient(to right, #f87171, #ef4444)',
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
+          )}
+        </div>
+      )}
 
       {/* =================== ADD/EDIT MODAL =================== */}
       {showModal && (
