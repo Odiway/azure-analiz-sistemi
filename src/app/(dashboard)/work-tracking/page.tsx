@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Briefcase, Plus, X, Save, Trash2, ChevronLeft, ChevronRight,
   Download, FileSpreadsheet, Calendar, FileText, Users, FolderKanban,
-  BarChart3, TrendingUp,
+  BarChart3, TrendingUp, Upload, CheckCircle, AlertCircle,
 } from 'lucide-react';
 
 // ===================== TYPES =====================
@@ -107,6 +107,12 @@ export default function WorkTrackingPage() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [people, setPeople] = useState<string[]>([]);
   const [projects, setProjects] = useState<{ project_code: string; project_name: string }[]>([]);
+
+  // Upload
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{ success: boolean; message: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Analysis tab
   const [analysisTab, setAnalysisTab] = useState<'none' | 'person' | 'project'>('none');
@@ -440,6 +446,30 @@ export default function WorkTrackingPage() {
     }
   }
 
+  // ===================== EXCEL UPLOAD =====================
+  async function handleExcelUpload(file: File) {
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('year', year.toString());
+      const res = await fetch('/api/work-items/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        setUploadResult({ success: true, message: data.message });
+        await fetchData();
+      } else {
+        setUploadResult({ success: false, message: data.error || 'Yükleme hatası' });
+      }
+    } catch {
+      setUploadResult({ success: false, message: 'Bağlantı hatası' });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   // ===================== LOADING STATE =====================
   if (loading) {
     return (
@@ -487,6 +517,9 @@ export default function WorkTrackingPage() {
           </button>
           <button onClick={downloadGeneralPDF} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-all">
             <FileText className="w-3.5 h-3.5" /> PDF
+          </button>
+          <button onClick={() => { setShowUpload(true); setUploadResult(null); }} className="flex items-center gap-1 px-2.5 py-2 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-violet-600 dark:text-violet-400 rounded-xl text-xs font-bold transition-all">
+            <Upload className="w-3.5 h-3.5" /> Yükle
           </button>
           <button onClick={openAdd} className="flex items-center gap-1 px-2.5 py-2 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-xs transition-all shadow-lg shadow-azure-200/60 dark:shadow-azure-900/30">
             <Plus className="w-3.5 h-3.5" /> Yeni İş
@@ -987,6 +1020,105 @@ export default function WorkTrackingPage() {
                 className="px-5 py-2.5 bg-gradient-to-r from-azure-500 to-blue-600 hover:from-azure-600 hover:to-blue-700 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50 flex items-center gap-1.5"
               >
                 <Save className="w-4 h-4" /> {saving ? '...' : editItem ? 'Güncelle' : 'Kaydet'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =================== UPLOAD MODAL =================== */}
+      {showUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-navy-900 rounded-3xl p-6 w-full max-w-md mx-4 shadow-2xl animate-scale-in">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-5 h-5 text-violet-500" /> Excel Yükle
+              </h3>
+              <button onClick={() => setShowUpload(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-800 rounded-xl p-3">
+                <p className="text-xs text-violet-700 dark:text-violet-300 font-medium leading-relaxed">
+                  Excel dosyanızda şu sütunlar olmalı:<br />
+                  <span className="font-bold">Proje Kodu | Projenin Adı | Çalışmanın Adı | Çalışan Kişi | Durum | Toplam | W1, W2...W52</span>
+                </p>
+                <p className="text-xs text-violet-500 dark:text-violet-400 mt-2">
+                  Mevcut verilerle eşleşen satırlar güncellenir, yeni satırlar eklenir. Yıl: <span className="font-bold">{year}</span>
+                </p>
+              </div>
+
+              <div
+                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${
+                  uploading
+                    ? 'border-violet-300 bg-violet-50/50 dark:border-violet-700 dark:bg-violet-500/5'
+                    : 'border-gray-200 dark:border-navy-700 hover:border-violet-400 dark:hover:border-violet-600 hover:bg-violet-50/30 dark:hover:bg-violet-500/5'
+                }`}
+                onClick={() => !uploading && fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const droppedFile = e.dataTransfer.files[0];
+                  if (droppedFile && (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls'))) {
+                    handleExcelUpload(droppedFile);
+                  }
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleExcelUpload(f);
+                  }}
+                />
+                {uploading ? (
+                  <div className="space-y-2">
+                    <div className="w-10 h-10 mx-auto border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
+                    <p className="text-sm font-bold text-violet-600 dark:text-violet-400">İşleniyor...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <FileSpreadsheet className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600" />
+                    <p className="text-sm font-bold text-gray-600 dark:text-gray-400">Dosyayı sürükleyin veya tıklayın</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">.xlsx veya .xls formatı</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Result message */}
+              {uploadResult && (
+                <div className={`flex items-start gap-2 rounded-xl p-3 ${
+                  uploadResult.success
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800'
+                    : 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-800'
+                }`}>
+                  {uploadResult.success ? (
+                    <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                  )}
+                  <p className={`text-xs font-medium leading-relaxed ${
+                    uploadResult.success ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'
+                  }`}>
+                    {uploadResult.message}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <div className="flex-1" />
+              <button
+                onClick={() => setShowUpload(false)}
+                className="px-4 py-2.5 bg-gray-100 dark:bg-navy-800 hover:bg-gray-200 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-semibold text-sm transition-colors"
+              >
+                Kapat
               </button>
             </div>
           </div>
