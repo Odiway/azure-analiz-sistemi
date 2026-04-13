@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf';
+﻿import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 // TEMSA corporate colors
@@ -15,6 +15,9 @@ const BLUE = [59, 130, 246] as const;
 const AMBER = [245, 158, 11] as const;
 const RED = [239, 68, 68] as const;
 const GRAY = [156, 163, 175] as const;
+
+// Font name constant
+const FONT = 'Roboto';
 
 interface WorkItem {
   id: number;
@@ -47,6 +50,45 @@ interface SummaryData {
   totalHours: { total: number; items_with_logs: number };
 }
 
+// ===================== FONT LOADING =====================
+let fontCache: { regular: string; bold: string } | null = null;
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+  }
+  return btoa(binary);
+}
+
+async function loadTurkishFonts(doc: jsPDF) {
+  if (!fontCache) {
+    const [regularRes, boldRes] = await Promise.all([
+      fetch('/fonts/Roboto-Regular.ttf'),
+      fetch('/fonts/Roboto-Bold.ttf'),
+    ]);
+    const [regularBuf, boldBuf] = await Promise.all([
+      regularRes.arrayBuffer(),
+      boldRes.arrayBuffer(),
+    ]);
+    fontCache = {
+      regular: arrayBufferToBase64(regularBuf),
+      bold: arrayBufferToBase64(boldBuf),
+    };
+  }
+
+  doc.addFileToVFS('Roboto-Regular.ttf', fontCache.regular);
+  doc.addFont('Roboto-Regular.ttf', FONT, 'normal');
+  doc.addFileToVFS('Roboto-Bold.ttf', fontCache.bold);
+  doc.addFont('Roboto-Bold.ttf', FONT, 'bold');
+  doc.setFont(FONT);
+}
+
 function formatDateTR(d: string | null) {
   if (!d) return '-';
   return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'long', year: 'numeric' });
@@ -68,16 +110,16 @@ function addCorporateHeader(doc: jsPDF, title: string, subtitle?: string) {
   doc.rect(0, 38, pageWidth, 1.5, 'F');
 
   // TEMSA text
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(20);
   doc.setTextColor(255, 255, 255);
   doc.text('TEMSA', 15, 18);
 
   // Department text
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT, 'normal');
   doc.setTextColor(200, 220, 255);
-  doc.text('CAE Departmani', 15, 26);
+  doc.text('CAE Departmanı', 15, 26);
 
   // Date on right
   doc.setFontSize(8);
@@ -87,18 +129,18 @@ function addCorporateHeader(doc: jsPDF, title: string, subtitle?: string) {
   // Confidential badge
   doc.setFontSize(7);
   doc.setTextColor(255, 200, 100);
-  doc.setFont('helvetica', 'bold');
-  doc.text('GIZLI / CONFIDENTIAL', pageWidth - 15, 26, { align: 'right' });
+  doc.setFont(FONT, 'bold');
+  doc.text('GİZLİ / CONFIDENTIAL', pageWidth - 15, 26, { align: 'right' });
 
   // Report title
   doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setTextColor(...TEMSA_DARK);
   doc.text(title, 15, 52);
 
   if (subtitle) {
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(FONT, 'normal');
     doc.setTextColor(...TEXT_MEDIUM);
     doc.text(subtitle, 15, 60);
   }
@@ -127,19 +169,19 @@ function addCorporateFooter(doc: jsPDF) {
     doc.line(0, pageHeight - 16, pageWidth, pageHeight - 16);
 
     // Left - Company info
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(FONT, 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(130, 130, 130);
-    doc.text('TEMSA Ulasim Araclari A.S. | CAE Departmani | Is Takip Sistemi', 15, pageHeight - 9);
+    doc.text('TEMSA Ulaşım Araçları A.Ş. | CAE Departmanı | İş Takip Sistemi', 15, pageHeight - 9);
 
     // Center - Page numbers
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT, 'bold');
     doc.setFontSize(7);
     doc.setTextColor(100, 100, 100);
     doc.text(`Sayfa ${i} / ${pageCount}`, pageWidth / 2, pageHeight - 9, { align: 'center' });
 
     // Right - Date
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(FONT, 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(130, 130, 130);
     doc.text(nowTR(), pageWidth - 15, pageHeight - 9, { align: 'right' });
@@ -162,13 +204,13 @@ function drawStatBox(doc: jsPDF, x: number, y: number, w: number, h: number, lab
   doc.rect(x, y + 3, w, 2, 'F');
 
   // Value
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(18);
   doc.setTextColor(...color);
   doc.text(value, x + w / 2, y + h / 2 + 1, { align: 'center' });
 
   // Label
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(FONT, 'normal');
   doc.setFontSize(7);
   doc.setTextColor(...TEXT_MEDIUM);
   doc.text(label, x + w / 2, y + h - 5, { align: 'center' });
@@ -196,12 +238,13 @@ function drawProgressBar(doc: jsPDF, x: number, y: number, w: number, h: number,
 }
 
 // ===================== GENERAL REPORT =====================
-export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
+export async function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   const doc = new jsPDF('p', 'mm', 'a4');
+  await loadTurkishFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // PAGE 1: Overview
-  let startY = addCorporateHeader(doc, 'Genel Is Takip Raporu', 'CAE Departmani - Tum Proje ve Is Kalemleri Ozeti');
+  let startY = addCorporateHeader(doc, 'Genel İş Takip Raporu', 'CAE Departmanı - Tüm Proje ve İş Kalemleri Özeti');
 
   const total = summary.statusDistribution.reduce((s, d) => s + d.count, 0);
   const active = summary.statusDistribution.find(d => d.status === 'Devam Ediyor')?.count || 0;
@@ -213,10 +256,10 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   const boxW = (pageWidth - 40) / 5;
   const boxH = 28;
   const boxes = [
-    { label: 'Toplam Is', value: total.toString(), color: TEMSA_BLUE },
+    { label: 'Toplam İş', value: total.toString(), color: TEMSA_BLUE },
     { label: 'Devam Eden', value: active.toString(), color: BLUE },
     { label: 'Tamamlanan', value: completed.toString(), color: GREEN },
-    { label: 'Baslanmamis', value: notStarted.toString(), color: GRAY },
+    { label: 'Başlanmamış', value: notStarted.toString(), color: GRAY },
     { label: 'Tamamlanma', value: `%${completionRate}`, color: completionRate >= 70 ? GREEN : completionRate >= 40 ? AMBER : RED },
   ];
   boxes.forEach((b, i) => drawStatBox(doc, 15 + i * (boxW + 2.5), startY, boxW, boxH, b.label, b.value, b.color));
@@ -224,10 +267,10 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   startY += boxH + 12;
 
   // Section: Status Distribution
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Durum Dagilimi', 15, startY);
+  doc.text('Durum Dağılımı', 15, startY);
   startY += 6;
 
   const barW = pageWidth - 30;
@@ -242,7 +285,7 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
       doc.setFillColor(...col);
       doc.roundedRect(15, startY, barW * (pct / 100), 7, 2, 2, 'F');
     }
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT, 'bold');
     doc.setFontSize(7);
     doc.setTextColor(...TEXT_DARK);
     doc.text(`${d.status}: ${d.count} (%${Math.round(pct)})`, 17, startY + 5);
@@ -252,15 +295,15 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
   startY += 6;
 
   // Section: Person Workload Table
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Kisi Bazli Is Yuku', 15, startY);
+  doc.text('Kişi Bazlı İş Yükü', 15, startY);
   startY += 4;
 
   autoTable(doc, {
     startY,
-    head: [['Kisi', 'Toplam', 'Devam Eden', 'Tamamlanan', 'Baslanmamis', 'Tamamlanma %']],
+    head: [['Kişi', 'Toplam', 'Devam Eden', 'Tamamlanan', 'Başlanmamış', 'Tamamlanma %']],
     body: summary.personWorkload.map(p => [
       p.assigned_to,
       p.total.toString(),
@@ -282,23 +325,23 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
       5: { halign: 'center', cellWidth: 27, fontStyle: 'bold' },
     },
     margin: { left: 15, right: 15 },
-    styles: { lineColor: [220, 225, 235], lineWidth: 0.2 },
+    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, font: 'Roboto' },
   });
 
   // PAGE 2: Category + Project Distribution
   doc.addPage();
-  startY = addCorporateHeader(doc, 'Kategori ve Proje Dagilimi', 'Detayli is kalemi dagilim analizi');
+  startY = addCorporateHeader(doc, 'Kategori ve Proje Dağılımı', 'Detaylı iş kalemi dağılım analizi');
 
   // Category Table
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Kategori Bazli Dagilim', 15, startY);
+  doc.text('Kategori Bazlı Dağılım', 15, startY);
   startY += 4;
 
   autoTable(doc, {
     startY,
-    head: [['Kategori', 'Is Sayisi', 'Oran']],
+    head: [['Kategori', 'İş Sayısı', 'Oran']],
     body: summary.categoryDistribution.map(c => [c.category, c.count.toString(), `%${total ? Math.round((c.count / total) * 100) : 0}`]),
     theme: 'grid',
     headStyles: { fillColor: [...TEMSA_BLUE], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -306,21 +349,21 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
     alternateRowStyles: { fillColor: [...LIGHT_BLUE] },
     columnStyles: { 0: { fontStyle: 'bold' }, 1: { halign: 'center' }, 2: { halign: 'center' } },
     margin: { left: 15, right: 15 },
-    styles: { lineColor: [220, 225, 235], lineWidth: 0.2 },
+    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, font: 'Roboto' },
   });
 
   startY = (doc as any).lastAutoTable.finalY + 14;
 
   // Project Table
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(11);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Proje Bazli Dagilim', 15, startY);
+  doc.text('Proje Bazlı Dağılım', 15, startY);
   startY += 4;
 
   autoTable(doc, {
     startY,
-    head: [['Proje Kodu', 'Proje Adi', 'Toplam', 'Tamamlanan', 'Devam Eden', 'Tamamlanma %']],
+    head: [['Proje Kodu', 'Proje Adı', 'Toplam', 'Tamamlanan', 'Devam Eden', 'Tamamlanma %']],
     body: summary.projectDistribution.map(p => [
       p.project_code, p.project_name, p.total.toString(), p.completed.toString(), p.active.toString(),
       `%${p.total ? Math.round((p.completed / p.total) * 100) : 0}`,
@@ -337,16 +380,16 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
       5: { halign: 'center', cellWidth: 24, fontStyle: 'bold' },
     },
     margin: { left: 15, right: 15 },
-    styles: { lineColor: [220, 225, 235], lineWidth: 0.2 },
+    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, font: 'Roboto' },
   });
 
   // PAGE 3+: Full work item list
   doc.addPage();
-  startY = addCorporateHeader(doc, 'Tum Is Kalemleri Listesi', `Toplam ${items.length} is kalemi`);
+  startY = addCorporateHeader(doc, 'Tüm İş Kalemleri Listesi', `Toplam ${items.length} iş kalemi`);
 
   autoTable(doc, {
     startY,
-    head: [['#', 'Proje', 'Is Adi', 'Kisi', 'Durum', 'Oncelik', 'Kategori']],
+    head: [['#', 'Proje', 'İş Adı', 'Kişi', 'Durum', 'Öncelik', 'Kategori']],
     body: items.map((item, i) => [
       (i + 1).toString(),
       item.project_code,
@@ -370,7 +413,7 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
       6: { cellWidth: 28 },
     },
     margin: { left: 15, right: 15 },
-    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak' },
+    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak', font: 'Roboto' },
     didParseCell: (data: any) => {
       if (data.section === 'body' && data.column.index === 4) {
         const val = data.cell.raw;
@@ -392,15 +435,16 @@ export function generateGeneralReport(items: WorkItem[], summary: SummaryData) {
 }
 
 // ===================== PERSON REPORT =====================
-export function generatePersonReport(
+export async function generatePersonReport(
   personName: string,
   items: WorkItem[],
   workload: PersonWorkload,
 ) {
   const doc = new jsPDF('p', 'mm', 'a4');
+  await loadTurkishFonts(doc);
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  let startY = addCorporateHeader(doc, `Kisi Raporu: ${personName}`, 'Bireysel is takip ve performans raporu');
+  let startY = addCorporateHeader(doc, `Kişi Raporu: ${personName}`, 'Bireysel iş takip ve performans raporu');
 
   const completionRate = workload.total ? Math.round((workload.completed / workload.total) * 100) : 0;
 
@@ -408,7 +452,7 @@ export function generatePersonReport(
   const boxW = (pageWidth - 40) / 4;
   const boxH = 30;
   const stats = [
-    { label: 'Toplam Is', value: workload.total.toString(), color: TEMSA_BLUE },
+    { label: 'Toplam İş', value: workload.total.toString(), color: TEMSA_BLUE },
     { label: 'Devam Eden', value: workload.active.toString(), color: BLUE },
     { label: 'Tamamlanan', value: workload.completed.toString(), color: GREEN },
     { label: 'Tamamlanma', value: `%${completionRate}`, color: completionRate >= 70 ? GREEN : completionRate >= 40 ? AMBER : RED },
@@ -418,10 +462,10 @@ export function generatePersonReport(
   startY += boxH + 12;
 
   // Progress bar 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(FONT, 'bold');
   doc.setFontSize(10);
   doc.setTextColor(...TEMSA_DARK);
-  doc.text('Ilerleme Durumu', 15, startY);
+  doc.text('İlerleme Durumu', 15, startY);
   startY += 5;
 
   const barTotal = workload.total || 1;
@@ -436,13 +480,13 @@ export function generatePersonReport(
   const legendItems: { label: string; color: readonly [number, number, number] }[] = [
     { label: `Tamamlanan: ${workload.completed}`, color: GREEN },
     { label: `Devam Eden: ${workload.active}`, color: BLUE },
-    { label: `Baslanmamis: ${workload.not_started}`, color: GRAY },
+    { label: `Başlanmamış: ${workload.not_started}`, color: GRAY },
   ];
   let legendX = 15;
   legendItems.forEach(item => {
     doc.setFillColor(item.color[0], item.color[1], item.color[2]);
     doc.circle(legendX + 2, startY + 1.5, 1.5, 'F');
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(FONT, 'normal');
     doc.setFontSize(7);
     doc.setTextColor(TEXT_MEDIUM[0], TEXT_MEDIUM[1], TEXT_MEDIUM[2]);
     doc.text(item.label, legendX + 6, startY + 2.5);
@@ -453,15 +497,15 @@ export function generatePersonReport(
   // Active work items table
   const activeItems = items.filter(i => i.status === 'Devam Ediyor');
   if (activeItems.length > 0) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...TEMSA_BLUE);
-    doc.text(`Devam Eden Isler (${activeItems.length})`, 15, startY);
+    doc.text(`Devam Eden İşler (${activeItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Oncelik', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adı', 'İş Adı', 'Öncelik', 'Kategori']],
       body: activeItems.map(item => [item.project_code, item.project_name, item.task_name, item.priority, item.category]),
       theme: 'grid',
       headStyles: { fillColor: [...BLUE], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -469,7 +513,7 @@ export function generatePersonReport(
       alternateRowStyles: { fillColor: [235, 245, 255] },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 22 }, 3: { halign: 'center', cellWidth: 20 }, 4: { cellWidth: 30 } },
       margin: { left: 15, right: 15 },
-      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak' },
+      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak', font: 'Roboto' },
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
   }
@@ -479,15 +523,15 @@ export function generatePersonReport(
   if (completedItems.length > 0) {
     if (startY > 230) { doc.addPage(); startY = 25; }
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...GREEN);
-    doc.text(`Tamamlanan Isler (${completedItems.length})`, 15, startY);
+    doc.text(`Tamamlanan İşler (${completedItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adı', 'İş Adı', 'Kategori']],
       body: completedItems.map(item => [item.project_code, item.project_name, item.task_name, item.category]),
       theme: 'grid',
       headStyles: { fillColor: [...GREEN], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -495,7 +539,7 @@ export function generatePersonReport(
       alternateRowStyles: { fillColor: [236, 253, 245] },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 22 }, 3: { cellWidth: 30 } },
       margin: { left: 15, right: 15 },
-      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak' },
+      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak', font: 'Roboto' },
     });
     startY = (doc as any).lastAutoTable.finalY + 10;
   }
@@ -505,15 +549,15 @@ export function generatePersonReport(
   if (nsItems.length > 0) {
     if (startY > 230) { doc.addPage(); startY = 25; }
 
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(FONT, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...GRAY);
-    doc.text(`Baslanmamis Isler (${nsItems.length})`, 15, startY);
+    doc.text(`Başlanmamış İşler (${nsItems.length})`, 15, startY);
     startY += 4;
 
     autoTable(doc, {
       startY,
-      head: [['Proje Kodu', 'Proje Adi', 'Is Adi', 'Kategori']],
+      head: [['Proje Kodu', 'Proje Adı', 'İş Adı', 'Kategori']],
       body: nsItems.map(item => [item.project_code, item.project_name, item.task_name, item.category]),
       theme: 'grid',
       headStyles: { fillColor: [140, 150, 165], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -521,17 +565,17 @@ export function generatePersonReport(
       alternateRowStyles: { fillColor: [...LIGHT_GRAY] },
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 22 }, 3: { cellWidth: 30 } },
       margin: { left: 15, right: 15 },
-      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak' },
+      styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak', font: 'Roboto' },
     });
   }
 
   // Full list on new page
   doc.addPage();
-  startY = addCorporateHeader(doc, `${personName} - Tum Isler`, `Toplam ${items.length} is kalemi`);
+  startY = addCorporateHeader(doc, `${personName} - Tüm İşler`, `Toplam ${items.length} iş kalemi`);
 
   autoTable(doc, {
     startY,
-    head: [['#', 'Proje', 'Is Adi', 'Durum', 'Oncelik', 'Kategori']],
+    head: [['#', 'Proje', 'İş Adı', 'Durum', 'Öncelik', 'Kategori']],
     body: items.map((item, i) => [(i + 1).toString(), item.project_code, item.task_name, item.status, item.priority, item.category]),
     theme: 'grid',
     headStyles: { fillColor: [...TEMSA_BLUE], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8, cellPadding: 3 },
@@ -545,7 +589,7 @@ export function generatePersonReport(
       5: { cellWidth: 28 },
     },
     margin: { left: 15, right: 15 },
-    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak' },
+    styles: { lineColor: [220, 225, 235], lineWidth: 0.2, overflow: 'linebreak', font: 'Roboto' },
     didParseCell: (data: any) => {
       if (data.section === 'body' && data.column.index === 3) {
         const val = data.cell.raw;

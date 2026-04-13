@@ -254,7 +254,7 @@ export default function WorkTrackingPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => summary && generateGeneralReport(items, summary)}
+            onClick={() => summary && generateGeneralReport(items, summary).catch(console.error)}
             disabled={!summary}
             className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-sm transition-all active:scale-[0.98] disabled:opacity-40"
           >
@@ -426,6 +426,34 @@ export default function WorkTrackingPage() {
       {/* TABLE TAB */}
       {tab === 'table' && (
         <div className="space-y-4">
+          {/* Quick Status Chips */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { key: 'all', label: 'Tümü', color: 'bg-gray-100 dark:bg-navy-800 text-gray-700 dark:text-gray-300' },
+              { key: 'Devam Ediyor', label: 'Devam Eden', color: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400' },
+              { key: 'Tamamlandı', label: 'Tamamlanan', color: 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400' },
+              { key: 'Başlanmadı', label: 'Başlanmamış', color: 'bg-gray-200 dark:bg-gray-600/30 text-gray-600 dark:text-gray-400' },
+              { key: 'Data Bekleniyor', label: 'Data Bekleniyor', color: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-400' },
+            ].map(chip => (
+              <button
+                key={chip.key}
+                onClick={() => { setFStatus(chip.key); setPage(1); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  fStatus === chip.key
+                    ? `${chip.color} ring-2 ring-azure-400 dark:ring-azure-500 shadow-md scale-105`
+                    : `${chip.color} opacity-60 hover:opacity-100`
+                }`}
+              >
+                {chip.label}
+                {chip.key !== 'all' && summary && (
+                  <span className="ml-1.5 opacity-70">
+                    {summary.statusDistribution.find(d => d.status === chip.key)?.count || 0}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
           {/* Filters Bar */}
           <div className="bg-white dark:bg-navy-900 rounded-2xl p-4 shadow-lg border border-gray-100 dark:border-navy-800">
             <div className="flex flex-wrap gap-3 items-center">
@@ -435,14 +463,15 @@ export default function WorkTrackingPage() {
                   type="text"
                   value={fSearch}
                   onChange={(e) => { setFSearch(e.target.value); setPage(1); }}
-                  placeholder="İş ara..."
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400"
+                  placeholder="İş adı, proje, kişi veya kategori ara..."
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-800 dark:text-gray-200 dark:bg-navy-800 focus:outline-none focus:border-azure-400 focus:ring-1 focus:ring-azure-400"
                 />
+                {fSearch && (
+                  <button onClick={() => { setFSearch(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-navy-700 transition-colors">
+                    <X className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
+                )}
               </div>
-              <select value={fStatus} onChange={e => { setFStatus(e.target.value); setPage(1); }} className="px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
-                <option value="all">Tüm Durumlar</option>
-                {filters.statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
               <select value={fPerson} onChange={e => { setFPerson(e.target.value); setPage(1); }} className="px-3 py-2.5 border border-gray-200 dark:border-navy-700 rounded-xl text-sm text-gray-700 dark:text-gray-300 dark:bg-navy-800 focus:outline-none focus:border-azure-400">
                 <option value="all">Tüm Kişiler</option>
                 {filters.people.map(p => <option key={p} value={p}>{p}</option>)}
@@ -455,7 +484,16 @@ export default function WorkTrackingPage() {
                 <option value="all">Tüm Kategoriler</option>
                 {filters.categories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {(fStatus !== 'all' || fPerson !== 'all' || fProject !== 'all' || fCategory !== 'all' || fSearch) && (
+                <button
+                  onClick={() => { setFStatus('all'); setFPerson('all'); setFProject('all'); setFCategory('all'); setFSearch(''); setPage(1); }}
+                  className="flex items-center gap-1.5 px-3 py-2.5 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-bold transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" /> Temizle
+                </button>
+              )}
+              <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5" />
                 {items.length} sonuç
               </div>
             </div>
@@ -551,7 +589,7 @@ export default function WorkTrackingPage() {
               <button
                 onClick={() => {
                   const pw = summary.personWorkload.find(p => p.assigned_to === reportPerson);
-                  if (pw) generatePersonReport(reportPerson, items.filter(i => i.assigned_to === reportPerson), pw);
+                  if (pw) generatePersonReport(reportPerson, items.filter(i => i.assigned_to === reportPerson), pw).catch(console.error);
                 }}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-navy-800 border border-gray-200 dark:border-navy-700 hover:bg-gray-50 dark:hover:bg-navy-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold text-sm transition-all active:scale-[0.98]"
               >
@@ -563,7 +601,7 @@ export default function WorkTrackingPage() {
             {personReportData.map(p => {
               const completionRate = p.total ? Math.round((p.completed / p.total) * 100) : 0;
               return (
-                <div key={p.assigned_to} className="bg-white dark:bg-navy-900 rounded-2xl p-5 shadow-lg border border-gray-100 dark:border-navy-800 transition-all hover:-translate-y-0.5 hover:shadow-xl">
+                <div key={p.assigned_to} onClick={() => setReportPerson(prev => prev === p.assigned_to ? 'all' : p.assigned_to)} className={`bg-white dark:bg-navy-900 rounded-2xl p-5 shadow-lg border-2 transition-all hover:-translate-y-0.5 hover:shadow-xl cursor-pointer ${reportPerson === p.assigned_to ? 'border-azure-500 dark:border-azure-400 ring-2 ring-azure-200 dark:ring-azure-500/30' : 'border-gray-100 dark:border-navy-800'}`}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-azure-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
                       {p.assigned_to.slice(0, 2).toUpperCase()}
@@ -599,7 +637,7 @@ export default function WorkTrackingPage() {
                     <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tamamlanma</span>
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={(e) => { e.stopPropagation(); generatePersonReport(p.assigned_to, items.filter(i => i.assigned_to === p.assigned_to), p); }}
+                        onClick={(e) => { e.stopPropagation(); generatePersonReport(p.assigned_to, items.filter(i => i.assigned_to === p.assigned_to), p).catch(console.error); }}
                         className="p-1.5 rounded-lg hover:bg-azure-50 dark:hover:bg-azure-500/10 text-gray-400 hover:text-azure-500 transition-colors"
                         title="PDF İndir"
                       >
