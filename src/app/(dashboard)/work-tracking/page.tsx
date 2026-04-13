@@ -6,6 +6,7 @@ import {
   Briefcase, Plus, X, Save, Trash2, ChevronLeft, ChevronRight,
   Download, FileSpreadsheet, Calendar, FileText, Users, FolderKanban,
   BarChart3, TrendingUp, Upload, CheckCircle, AlertCircle,
+  Clock, Target, Flame, Award, Zap, Activity,
 } from 'lucide-react';
 
 // ===================== TYPES =====================
@@ -771,183 +772,462 @@ export default function WorkTrackingPage() {
       </div>
 
       {/* =================== PERSON ANALYSIS =================== */}
-      {analysisTab === 'person' && (
-        <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-4 mb-4 animate-fade-in">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="w-5 h-5 text-azure-500" />
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">Kişi Bazlı İş Yükü Analizi</h2>
-          </div>
+      {analysisTab === 'person' && (() => {
+        // Pre-compute per-person data from weekly grid
+        const personDataMap: Record<string, {
+          hours: number; activeWeeks: number; weeklyHours: number[];
+          projectSet: Set<string>; taskList: { task: string; project: string; hours: number; status: string }[];
+          maxWeekHours: number; currentWeekHours: number; last4WeeksHours: number;
+        }> = {};
 
-          {summaryLoading ? (
-            <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
-          ) : summary?.personWorkload ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {summary.personWorkload.map((person: any) => {
-                const completionRate = person.total ? Math.round((person.completed / person.total) * 100) : 0;
-                // Calculate weekly hours from logs for this person
-                const personItems = items.filter(i => i.assigned_to === person.assigned_to);
-                let personHours = 0;
-                for (const item of personItems) {
-                  for (const w of weeks) {
-                    personHours += logs[`${item.id}_${w.week}`] || 0;
-                  }
-                }
+        const currentWeekNum = weeks.find(w => w.isCurrent)?.week || 0;
 
-                return (
-                  <div key={person.assigned_to} className="bg-gray-50 dark:bg-navy-800/50 rounded-xl p-4 border border-gray-100 dark:border-navy-700 hover:border-azure-300 dark:hover:border-azure-700 transition-colors">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="font-bold text-sm text-gray-900 dark:text-white">{person.assigned_to}</h3>
-                      <button
-                        onClick={() => downloadPersonPDF(person.assigned_to)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-colors"
-                        title="PDF İndir"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+        for (const item of items) {
+          const name = item.assigned_to;
+          if (!personDataMap[name]) {
+            personDataMap[name] = {
+              hours: 0, activeWeeks: 0, weeklyHours: new Array(weeks.length).fill(0),
+              projectSet: new Set(), taskList: [], maxWeekHours: 0, currentWeekHours: 0, last4WeeksHours: 0,
+            };
+          }
+          const pd = personDataMap[name];
+          pd.projectSet.add(item.project_code);
+          let taskHours = 0;
+          for (let wi = 0; wi < weeks.length; wi++) {
+            const h = logs[`${item.id}_${weeks[wi].week}`] || 0;
+            pd.weeklyHours[wi] += h;
+            pd.hours += h;
+            taskHours += h;
+          }
+          pd.taskList.push({ task: item.task_name, project: item.project_code, hours: taskHours, status: item.status });
+        }
 
-                    {/* Stats grid */}
-                    <div className="grid grid-cols-4 gap-2 mb-3">
-                      <div className="text-center">
-                        <div className="text-lg font-extrabold text-gray-800 dark:text-gray-200">{person.total}</div>
-                        <div className="text-[9px] text-gray-400 font-medium">Toplam</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-extrabold text-blue-500">{person.active}</div>
-                        <div className="text-[9px] text-gray-400 font-medium">Devam</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-extrabold text-emerald-500">{person.completed}</div>
-                        <div className="text-[9px] text-gray-400 font-medium">Bitti</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-extrabold text-amber-500">{personHours}h</div>
-                        <div className="text-[9px] text-gray-400 font-medium">Saat</div>
-                      </div>
-                    </div>
+        for (const pd of Object.values(personDataMap)) {
+          pd.activeWeeks = pd.weeklyHours.filter(h => h > 0).length;
+          pd.maxWeekHours = Math.max(...pd.weeklyHours, 1);
+          // Current week hours
+          if (currentWeekNum > 0) {
+            const cwIdx = weeks.findIndex(w => w.week === currentWeekNum);
+            if (cwIdx >= 0) pd.currentWeekHours = pd.weeklyHours[cwIdx];
+            // Last 4 weeks
+            for (let i = Math.max(0, cwIdx - 3); i <= cwIdx; i++) {
+              pd.last4WeeksHours += pd.weeklyHours[i];
+            }
+          }
+          pd.taskList.sort((a, b) => b.hours - a.hours);
+        }
 
-                    {/* Progress bar */}
-                    <div className="w-full h-2 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{ width: `${completionRate}%` }} />
-                    </div>
-                    <div className="text-right mt-1">
-                      <span className={`text-[10px] font-bold ${completionRate >= 70 ? 'text-emerald-500' : completionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
-                        %{completionRate} tamamlandı
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+        return (
+          <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-5 mb-4 animate-fade-in">
+            <div className="flex items-center gap-2 mb-5">
+              <Users className="w-5 h-5 text-azure-500" />
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">Kişi Bazlı İş Yükü Analizi</h2>
+              <span className="text-[10px] bg-azure-100 dark:bg-azure-500/20 text-azure-600 dark:text-azure-400 px-2 py-0.5 rounded-full font-bold ml-auto">{people.length} kişi</span>
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
-          )}
-        </div>
-      )}
 
-      {/* =================== PROJECT ANALYSIS =================== */}
-      {analysisTab === 'project' && (
-        <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-4 mb-4 animate-fade-in">
-          <div className="flex items-center gap-2 mb-4">
-            <FolderKanban className="w-5 h-5 text-azure-500" />
-            <h2 className="text-base font-bold text-gray-900 dark:text-white">Proje Bazlı Dağılım Analizi</h2>
-          </div>
+            {/* Team overview row */}
+            {(() => {
+              const totalPeople = Object.keys(personDataMap).length;
+              const totalHours = Object.values(personDataMap).reduce((s, d) => s + d.hours, 0);
+              const avgHours = totalPeople > 0 ? Math.round(totalHours / totalPeople) : 0;
+              const topPerson = Object.entries(personDataMap).sort((a, b) => b[1].hours - a[1].hours)[0];
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-500/10 dark:to-blue-500/5 rounded-xl p-3 border border-blue-100 dark:border-blue-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Users className="w-3.5 h-3.5 text-blue-500" /><span className="text-[10px] font-bold text-blue-500">Toplam Ekip</span></div>
+                    <div className="text-2xl font-extrabold text-blue-700 dark:text-blue-300">{totalPeople}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-500/10 dark:to-purple-500/5 rounded-xl p-3 border border-purple-100 dark:border-purple-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Clock className="w-3.5 h-3.5 text-purple-500" /><span className="text-[10px] font-bold text-purple-500">Toplam Saat</span></div>
+                    <div className="text-2xl font-extrabold text-purple-700 dark:text-purple-300">{totalHours}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-500/10 dark:to-amber-500/5 rounded-xl p-3 border border-amber-100 dark:border-amber-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><BarChart3 className="w-3.5 h-3.5 text-amber-500" /><span className="text-[10px] font-bold text-amber-500">Ort. Saat/Kişi</span></div>
+                    <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-300">{avgHours}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-500/10 dark:to-emerald-500/5 rounded-xl p-3 border border-emerald-100 dark:border-emerald-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Award className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-emerald-500">En Aktif</span></div>
+                    <div className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300 truncate">{topPerson ? topPerson[0] : '-'}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
-          {summaryLoading ? (
-            <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
-          ) : summary?.projectDistribution ? (
-            <div className="space-y-3">
-              {/* Overview stat bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
-                <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-3 text-center border border-blue-100 dark:border-blue-900/30">
-                  <div className="text-2xl font-extrabold text-blue-600 dark:text-blue-400">{summary.projectDistribution.length}</div>
-                  <div className="text-[10px] text-blue-500 font-bold">Toplam Proje</div>
-                </div>
-                <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-3 text-center border border-emerald-100 dark:border-emerald-900/30">
-                  <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                    {summary.projectDistribution.reduce((s: number, p: any) => s + p.completed, 0)}
-                  </div>
-                  <div className="text-[10px] text-emerald-500 font-bold">Tamamlanan İş</div>
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-500/10 rounded-xl p-3 text-center border border-amber-100 dark:border-amber-900/30">
-                  <div className="text-2xl font-extrabold text-amber-600 dark:text-amber-400">
-                    {summary.projectDistribution.reduce((s: number, p: any) => s + p.active, 0)}
-                  </div>
-                  <div className="text-[10px] text-amber-500 font-bold">Devam Eden</div>
-                </div>
-                <div className="bg-purple-50 dark:bg-purple-500/10 rounded-xl p-3 text-center border border-purple-100 dark:border-purple-900/30">
-                  <div className="text-2xl font-extrabold text-purple-600 dark:text-purple-400">
-                    {summary.totalHours ? Number(summary.totalHours.total).toFixed(0) : 0}
-                  </div>
-                  <div className="text-[10px] text-purple-500 font-bold">Toplam Saat</div>
-                </div>
-              </div>
+            {summaryLoading ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+            ) : summary?.personWorkload ? (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                {summary.personWorkload.map((person: any) => {
+                  const completionRate = person.total ? Math.round((person.completed / person.total) * 100) : 0;
+                  const pd = personDataMap[person.assigned_to];
+                  if (!pd) return null;
+                  const avgPerWeek = pd.activeWeeks > 0 ? (pd.hours / pd.activeWeeks).toFixed(1) : '0';
+                  const projectCount = pd.projectSet.size;
 
-              {/* Project cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {summary.projectDistribution.map((project: any) => {
-                  const completionRate = project.total ? Math.round((project.completed / project.total) * 100) : 0;
-                  // Calculate project hours from logs
-                  const projectItems = items.filter(i => i.project_code === project.project_code);
-                  let projectHours = 0;
-                  for (const item of projectItems) {
-                    for (const w of weeks) {
-                      projectHours += logs[`${item.id}_${w.week}`] || 0;
-                    }
-                  }
+                  // Mini weekly sparkline (last 12 weeks from current)
+                  const currentIdx = weeks.findIndex(w => w.isCurrent);
+                  const sparkStart = Math.max(0, currentIdx - 11);
+                  const sparkEnd = currentIdx >= 0 ? currentIdx + 1 : weeks.length;
+                  const sparkData = pd.weeklyHours.slice(sparkStart, sparkEnd);
+                  const sparkMax = Math.max(...sparkData, 1);
 
                   return (
-                    <div key={project.project_code} className="bg-gray-50 dark:bg-navy-800/50 rounded-xl p-4 border border-gray-100 dark:border-navy-700">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <span className="font-mono font-extrabold text-azure-600 dark:text-azure-400 text-sm">{project.project_code}</span>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.project_name}</p>
+                    <div key={person.assigned_to} className="bg-gray-50 dark:bg-navy-800/50 rounded-2xl p-5 border border-gray-100 dark:border-navy-700 hover:border-azure-300 dark:hover:border-azure-700 hover:shadow-md transition-all">
+                      {/* Card header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-azure-400 to-blue-600 flex items-center justify-center text-white font-extrabold text-sm shadow-lg">
+                            {person.assigned_to.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-sm text-gray-900 dark:text-white">{person.assigned_to}</h3>
+                            <p className="text-[10px] text-gray-400">{projectCount} proje · {pd.activeWeeks} aktif hafta</p>
+                          </div>
                         </div>
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          completionRate >= 70 ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                          : completionRate >= 40 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
-                          : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
-                        }`}>
-                          %{completionRate}
-                        </span>
+                        <button
+                          onClick={() => downloadPersonPDF(person.assigned_to)}
+                          className="p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-colors"
+                          title="PDF İndir"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      <div className="grid grid-cols-4 gap-2 mb-3">
-                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
-                          <div className="text-sm font-bold text-gray-800 dark:text-gray-200">{project.total}</div>
-                          <div className="text-[8px] text-gray-400">Toplam</div>
+                      {/* Stats row */}
+                      <div className="grid grid-cols-5 gap-1.5 mb-4">
+                        <div className="bg-white dark:bg-navy-900 rounded-xl p-2 text-center">
+                          <div className="text-base font-extrabold text-gray-800 dark:text-gray-200">{person.total}</div>
+                          <div className="text-[8px] text-gray-400 font-bold">TOPLAM İŞ</div>
                         </div>
-                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
-                          <div className="text-sm font-bold text-blue-500">{project.active}</div>
-                          <div className="text-[8px] text-gray-400">Devam</div>
+                        <div className="bg-white dark:bg-navy-900 rounded-xl p-2 text-center">
+                          <div className="text-base font-extrabold text-blue-500">{person.active}</div>
+                          <div className="text-[8px] text-gray-400 font-bold">DEVAM</div>
                         </div>
-                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
-                          <div className="text-sm font-bold text-emerald-500">{project.completed}</div>
-                          <div className="text-[8px] text-gray-400">Bitti</div>
+                        <div className="bg-white dark:bg-navy-900 rounded-xl p-2 text-center">
+                          <div className="text-base font-extrabold text-emerald-500">{person.completed}</div>
+                          <div className="text-[8px] text-gray-400 font-bold">BİTTİ</div>
                         </div>
-                        <div className="text-center bg-white dark:bg-navy-900 rounded-lg py-1.5">
-                          <div className="text-sm font-bold text-purple-500">{projectHours}h</div>
-                          <div className="text-[8px] text-gray-400">Saat</div>
+                        <div className="bg-white dark:bg-navy-900 rounded-xl p-2 text-center">
+                          <div className="text-base font-extrabold text-purple-500">{pd.hours}</div>
+                          <div className="text-[8px] text-gray-400 font-bold">SAAT</div>
+                        </div>
+                        <div className="bg-white dark:bg-navy-900 rounded-xl p-2 text-center">
+                          <div className="text-base font-extrabold text-amber-500">{avgPerWeek}</div>
+                          <div className="text-[8px] text-gray-400 font-bold">ORT/HFT</div>
                         </div>
                       </div>
 
-                      {/* Progress bar */}
-                      <div className="w-full h-1.5 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{
-                          width: `${completionRate}%`,
-                          background: completionRate >= 70 ? 'linear-gradient(to right, #34d399, #10b981)' : completionRate >= 40 ? 'linear-gradient(to right, #fbbf24, #f59e0b)' : 'linear-gradient(to right, #f87171, #ef4444)',
-                        }} />
+                      {/* Completion progress */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Tamamlanma</span>
+                          <span className={`text-[10px] font-extrabold ${completionRate >= 70 ? 'text-emerald-500' : completionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>%{completionRate}</span>
+                        </div>
+                        <div className="w-full h-2.5 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
+                          {person.total > 0 && (
+                            <div className="h-full flex">
+                              <div className="bg-emerald-500 h-full transition-all" style={{ width: `${(person.completed / person.total) * 100}%` }} />
+                              <div className="bg-blue-500 h-full transition-all" style={{ width: `${(person.active / person.total) * 100}%` }} />
+                              <div className="bg-amber-400 h-full transition-all" style={{ width: `${(person.not_started / person.total) * 100}%` }} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-3 mt-1">
+                          <span className="text-[8px] text-emerald-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Bitti {person.completed}</span>
+                          <span className="text-[8px] text-blue-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" /> Devam {person.active}</span>
+                          <span className="text-[8px] text-amber-500 font-bold flex items-center gap-0.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" /> Bekliyor {person.not_started}</span>
+                        </div>
+                      </div>
+
+                      {/* Weekly activity sparkline */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1"><Activity className="w-3 h-3" /> Son 12 Hafta</span>
+                          <span className="text-[10px] font-bold text-azure-500">Bu hafta: {pd.currentWeekHours}h</span>
+                        </div>
+                        <div className="flex items-end gap-[2px] h-8">
+                          {sparkData.map((h, i) => (
+                            <div
+                              key={i}
+                              className={`flex-1 rounded-t-sm transition-all ${i === sparkData.length - 1 ? 'bg-red-500' : h > 0 ? 'bg-azure-400 dark:bg-azure-500' : 'bg-gray-200 dark:bg-navy-700'}`}
+                              style={{ height: `${Math.max(h > 0 ? 15 : 4, (h / sparkMax) * 100)}%` }}
+                              title={`W${weeks[sparkStart + i]?.week || ''}: ${h}h`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Top tasks */}
+                      <div>
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 block">En Çok Çalışılan</span>
+                        <div className="space-y-1">
+                          {pd.taskList.slice(0, 3).map((t, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-white dark:bg-navy-900 rounded-lg px-2.5 py-1.5">
+                              <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOTS[t.status] || 'bg-gray-400'}`} />
+                              <span className="text-[10px] font-mono font-bold text-azure-500 flex-shrink-0">{t.project}</span>
+                              <span className="text-[10px] text-gray-600 dark:text-gray-400 truncate flex-1">{t.task}</span>
+                              <span className="text-[10px] font-bold text-gray-800 dark:text-gray-200 flex-shrink-0">{t.hours}h</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* =================== PROJECT ANALYSIS =================== */}
+      {analysisTab === 'project' && (() => {
+        // Pre-compute per-project data
+        const projectDataMap: Record<string, {
+          hours: number; weeklyHours: number[]; activeWeeks: number;
+          people: Set<string>; taskList: { task: string; person: string; hours: number; status: string }[];
+          currentWeekHours: number; last4WeeksHours: number;
+        }> = {};
+
+        const currentWeekNum = weeks.find(w => w.isCurrent)?.week || 0;
+
+        for (const item of items) {
+          const code = item.project_code;
+          if (!projectDataMap[code]) {
+            projectDataMap[code] = {
+              hours: 0, weeklyHours: new Array(weeks.length).fill(0), activeWeeks: 0,
+              people: new Set(), taskList: [], currentWeekHours: 0, last4WeeksHours: 0,
+            };
+          }
+          const pd = projectDataMap[code];
+          pd.people.add(item.assigned_to);
+          let taskHours = 0;
+          for (let wi = 0; wi < weeks.length; wi++) {
+            const h = logs[`${item.id}_${weeks[wi].week}`] || 0;
+            pd.weeklyHours[wi] += h;
+            pd.hours += h;
+            taskHours += h;
+          }
+          pd.taskList.push({ task: item.task_name, person: item.assigned_to, hours: taskHours, status: item.status });
+        }
+
+        for (const pd of Object.values(projectDataMap)) {
+          pd.activeWeeks = pd.weeklyHours.filter(h => h > 0).length;
+          if (currentWeekNum > 0) {
+            const cwIdx = weeks.findIndex(w => w.week === currentWeekNum);
+            if (cwIdx >= 0) pd.currentWeekHours = pd.weeklyHours[cwIdx];
+            for (let i = Math.max(0, cwIdx - 3); i <= cwIdx; i++) {
+              pd.last4WeeksHours += pd.weeklyHours[i];
+            }
+          }
+          pd.taskList.sort((a, b) => b.hours - a.hours);
+        }
+
+        const totalProjectHours = Object.values(projectDataMap).reduce((s, d) => s + d.hours, 0);
+
+        return (
+          <div className="bg-white dark:bg-navy-900 rounded-2xl shadow-lg border border-gray-100 dark:border-navy-800 p-5 mb-4 animate-fade-in">
+            <div className="flex items-center gap-2 mb-5">
+              <FolderKanban className="w-5 h-5 text-azure-500" />
+              <h2 className="text-base font-bold text-gray-900 dark:text-white">Proje Bazlı Dağılım Analizi</h2>
+              <span className="text-[10px] bg-azure-100 dark:bg-azure-500/20 text-azure-600 dark:text-azure-400 px-2 py-0.5 rounded-full font-bold ml-auto">{projects.length} proje</span>
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
-          )}
-        </div>
-      )}
+
+            {summaryLoading ? (
+              <div className="text-center py-8 text-gray-400 text-sm">Yükleniyor...</div>
+            ) : summary?.projectDistribution ? (
+              <div className="space-y-5">
+                {/* Overview stats */}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-500/10 dark:to-blue-500/5 rounded-xl p-3 border border-blue-100 dark:border-blue-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><FolderKanban className="w-3.5 h-3.5 text-blue-500" /><span className="text-[10px] font-bold text-blue-500">Projeler</span></div>
+                    <div className="text-2xl font-extrabold text-blue-700 dark:text-blue-300">{summary.projectDistribution.length}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-500/10 dark:to-emerald-500/5 rounded-xl p-3 border border-emerald-100 dark:border-emerald-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><CheckCircle className="w-3.5 h-3.5 text-emerald-500" /><span className="text-[10px] font-bold text-emerald-500">Tamamlanan</span></div>
+                    <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{summary.projectDistribution.reduce((s: number, p: any) => s + p.completed, 0)}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-500/10 dark:to-amber-500/5 rounded-xl p-3 border border-amber-100 dark:border-amber-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Zap className="w-3.5 h-3.5 text-amber-500" /><span className="text-[10px] font-bold text-amber-500">Devam Eden</span></div>
+                    <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-300">{summary.projectDistribution.reduce((s: number, p: any) => s + p.active, 0)}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-500/10 dark:to-purple-500/5 rounded-xl p-3 border border-purple-100 dark:border-purple-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Clock className="w-3.5 h-3.5 text-purple-500" /><span className="text-[10px] font-bold text-purple-500">Toplam Saat</span></div>
+                    <div className="text-2xl font-extrabold text-purple-700 dark:text-purple-300">{totalProjectHours}</div>
+                  </div>
+                  <div className="bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-500/10 dark:to-rose-500/5 rounded-xl p-3 border border-rose-100 dark:border-rose-900/30">
+                    <div className="flex items-center gap-1.5 mb-1"><Flame className="w-3.5 h-3.5 text-rose-500" /><span className="text-[10px] font-bold text-rose-500">Bu Hafta</span></div>
+                    <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-300">{Object.values(projectDataMap).reduce((s, d) => s + d.currentWeekHours, 0)}h</div>
+                  </div>
+                </div>
+
+                {/* Saat dağılım bar */}
+                {totalProjectHours > 0 && (
+                  <div>
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-2 block">Saat Dağılımı (Proje Bazlı)</span>
+                    <div className="w-full h-5 bg-gray-100 dark:bg-navy-800 rounded-full overflow-hidden flex">
+                      {summary.projectDistribution.map((project: any, i: number) => {
+                        const ph = projectDataMap[project.project_code]?.hours || 0;
+                        const pct = (ph / totalProjectHours) * 100;
+                        if (pct < 1) return null;
+                        const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-rose-500', 'bg-cyan-500', 'bg-teal-500', 'bg-orange-500', 'bg-pink-500', 'bg-indigo-500'];
+                        return (
+                          <div
+                            key={project.project_code}
+                            className={`${colors[i % colors.length]} h-full transition-all relative group`}
+                            style={{ width: `${pct}%` }}
+                            title={`${project.project_code}: ${ph}h (%${Math.round(pct)})`}
+                          />
+                        );
+                      })}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                      {summary.projectDistribution.map((project: any, i: number) => {
+                        const ph = projectDataMap[project.project_code]?.hours || 0;
+                        if (ph === 0) return null;
+                        const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-purple-500', 'bg-rose-500', 'bg-cyan-500', 'bg-teal-500', 'bg-orange-500', 'bg-pink-500', 'bg-indigo-500'];
+                        return (
+                          <span key={project.project_code} className="text-[9px] text-gray-500 dark:text-gray-400 font-bold flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-sm inline-block ${colors[i % colors.length]}`} />
+                            {project.project_code} {Math.round((ph / totalProjectHours) * 100)}%
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Project cards */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {summary.projectDistribution.map((project: any) => {
+                    const completionRate = project.total ? Math.round((project.completed / project.total) * 100) : 0;
+                    const pd = projectDataMap[project.project_code];
+                    if (!pd) return null;
+                    const peopleCount = pd.people.size;
+                    const avgPerWeek = pd.activeWeeks > 0 ? (pd.hours / pd.activeWeeks).toFixed(1) : '0';
+
+                    // Sparkline
+                    const currentIdx = weeks.findIndex(w => w.isCurrent);
+                    const sparkStart = Math.max(0, currentIdx - 11);
+                    const sparkEnd = currentIdx >= 0 ? currentIdx + 1 : weeks.length;
+                    const sparkData = pd.weeklyHours.slice(sparkStart, sparkEnd);
+                    const sparkMax = Math.max(...sparkData, 1);
+
+                    return (
+                      <div key={project.project_code} className="bg-gray-50 dark:bg-navy-800/50 rounded-2xl p-5 border border-gray-100 dark:border-navy-700 hover:border-azure-300 dark:hover:border-azure-700 hover:shadow-md transition-all">
+                        {/* Header */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-extrabold text-azure-600 dark:text-azure-400 text-base">{project.project_code}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                completionRate >= 70 ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                : completionRate >= 40 ? 'bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                : 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                              }`}>%{completionRate}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{project.project_name}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] text-gray-400">Bu hafta</div>
+                            <div className="text-sm font-extrabold text-rose-500">{pd.currentWeekHours}h</div>
+                          </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-6 gap-1.5 mb-4">
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-gray-800 dark:text-gray-200">{project.total}</div>
+                            <div className="text-[7px] text-gray-400 font-bold">TOPLAM</div>
+                          </div>
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-blue-500">{project.active}</div>
+                            <div className="text-[7px] text-gray-400 font-bold">DEVAM</div>
+                          </div>
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-emerald-500">{project.completed}</div>
+                            <div className="text-[7px] text-gray-400 font-bold">BİTTİ</div>
+                          </div>
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-purple-500">{pd.hours}h</div>
+                            <div className="text-[7px] text-gray-400 font-bold">SAAT</div>
+                          </div>
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-amber-500">{avgPerWeek}</div>
+                            <div className="text-[7px] text-gray-400 font-bold">ORT/HFT</div>
+                          </div>
+                          <div className="bg-white dark:bg-navy-900 rounded-lg p-1.5 text-center">
+                            <div className="text-sm font-bold text-cyan-500">{peopleCount}</div>
+                            <div className="text-[7px] text-gray-400 font-bold">KİŞİ</div>
+                          </div>
+                        </div>
+
+                        {/* Multi-segment progress */}
+                        <div className="mb-4">
+                          <div className="w-full h-2 bg-gray-200 dark:bg-navy-700 rounded-full overflow-hidden">
+                            {project.total > 0 && (
+                              <div className="h-full flex">
+                                <div className="bg-emerald-500 h-full" style={{ width: `${(project.completed / project.total) * 100}%` }} />
+                                <div className="bg-blue-500 h-full" style={{ width: `${(project.active / project.total) * 100}%` }} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Sparkline */}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1"><Activity className="w-3 h-3" /> Son 12 Hafta</span>
+                            <span className="text-[10px] font-bold text-gray-400">Son 4 hafta: {pd.last4WeeksHours}h</span>
+                          </div>
+                          <div className="flex items-end gap-[2px] h-7">
+                            {sparkData.map((h, i) => (
+                              <div
+                                key={i}
+                                className={`flex-1 rounded-t-sm transition-all ${i === sparkData.length - 1 ? 'bg-red-500' : h > 0 ? 'bg-azure-400 dark:bg-azure-500' : 'bg-gray-200 dark:bg-navy-700'}`}
+                                style={{ height: `${Math.max(h > 0 ? 15 : 4, (h / sparkMax) * 100)}%` }}
+                                title={`W${weeks[sparkStart + i]?.week || ''}: ${h}h`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Team members + tasks */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 block">Ekip</span>
+                            <div className="flex flex-wrap gap-1">
+                              {Array.from(pd.people).map(p => (
+                                <span key={p} className="text-[9px] bg-white dark:bg-navy-900 border border-gray-100 dark:border-navy-700 rounded-md px-1.5 py-0.5 font-bold text-gray-600 dark:text-gray-400">{p}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 block">En Yoğun</span>
+                            <div className="space-y-0.5">
+                              {pd.taskList.slice(0, 2).map((t, i) => (
+                                <div key={i} className="flex items-center gap-1">
+                                  <div className={`w-1 h-1 rounded-full ${STATUS_DOTS[t.status] || 'bg-gray-400'}`} />
+                                  <span className="text-[9px] text-gray-600 dark:text-gray-400 truncate">{t.task}</span>
+                                  <span className="text-[9px] font-bold text-gray-800 dark:text-gray-200 ml-auto flex-shrink-0">{t.hours}h</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-400 text-sm">Veri bulunamadı</div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* =================== ADD/EDIT MODAL =================== */}
       {showModal && (
