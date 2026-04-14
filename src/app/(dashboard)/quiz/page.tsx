@@ -269,8 +269,8 @@ export default function QuizPage() {
                 <Trophy className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-navy-900 dark:text-white">Bilgi YarÄ±ÅŸmasÄ±</h1>
-                <p className="text-sm text-navy-500 dark:text-navy-400">TakÄ±m arkadaÅŸlarÄ±nla yarÄ±ÅŸ!</p>
+                <h1 className="text-2xl font-bold text-navy-900 dark:text-white">Bilgi Yarışması</h1>
+                <p className="text-sm text-navy-500 dark:text-navy-400">Takım arkadaşlarınla yarış!</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -296,7 +296,7 @@ export default function QuizPage() {
                 }`}
               >
                 <Trophy className="w-4 h-4 inline mr-1" />
-                YarÄ±ÅŸma
+                Yarışma
               </button>
               <button
                 onClick={() => { setShowTab('leaderboard'); fetchLeaderboard(); }}
@@ -307,7 +307,7 @@ export default function QuizPage() {
                 }`}
               >
                 <Crown className="w-4 h-4 inline mr-1" />
-                SÄ±ralama
+                Sıralama
               </button>
             </div>
           </div>
@@ -316,10 +316,10 @@ export default function QuizPage() {
             <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 p-6">
               <h2 className="text-xl font-bold text-navy-900 dark:text-white mb-4 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-amber-500" />
-                TÃ¼m Zamanlar SÄ±ralamasÄ±
+                Tüm Zamanlar Sıralaması
               </h2>
               {leaderboard.length === 0 ? (
-                <p className="text-center text-navy-500 dark:text-navy-400 py-8">HenÃ¼z yarÄ±ÅŸma yapÄ±lmamÄ±ÅŸ</p>
+                <p className="text-center text-navy-500 dark:text-navy-400 py-8">Henüz yarışma yapılmamış</p>
               ) : (
                 <div className="space-y-2">
                   {leaderboard.map((entry, i) => (
@@ -335,11 +335,11 @@ export default function QuizPage() {
                         i === 2 ? 'bg-orange-400 text-white' :
                         'bg-navy-200 dark:bg-navy-700 text-navy-600 dark:text-navy-300'
                       }`}>
-                        {i < 3 ? ['ğŸ¥‡', 'ğŸ¥ˆ', 'ğŸ¥‰'][i] : i + 1}
+                        {i < 3 ? ['g���', 'g���', 'g���'][i] : i + 1}
                       </div>
                       <div className="flex-1">
                         <span className="font-semibold text-navy-900 dark:text-white">{entry.user_name}</span>
-                        <span className="text-xs text-navy-500 dark:text-navy-400 ml-2">{entry.games_played} oyun Â· {entry.wins} galibiyet</span>
+                        <span className="text-xs text-navy-500 dark:text-navy-400 ml-2">{entry.games_played} oyun · {entry.wins} galibiyet</span>
                       </div>
                       <div className="text-lg font-bold text-amber-600 dark:text-amber-400">{entry.total_score.toLocaleString()}</div>
                     </div>
@@ -355,8 +355,8 @@ export default function QuizPage() {
                   {!canStart && cooldownLeft > 0 ? (
                     <div>
                       <Clock className="w-16 h-16 mx-auto text-navy-400 dark:text-navy-500 mb-4" />
-                      <h2 className="text-xl font-bold text-navy-900 dark:text-white mb-2">Bekleme SÃ¼resi</h2>
-                      <p className="text-navy-500 dark:text-navy-400 mb-4">Bir sonraki yarÄ±ÅŸma iÃ§in bekleyin</p>
+                      <h2 className="text-xl font-bold text-navy-900 dark:text-white mb-2">Bekleme Süresi</h2>
+                      <p className="text-navy-500 dark:text-navy-400 mb-4">Bir sonraki yarışma için bekleyin</p>
                       <div className="text-4xl font-mono font-bold text-amber-500">
                         {Math.floor(cooldownLeft / 60)}:{(cooldownLeft % 60).toString().padStart(2, '0')}
                       </div>
@@ -366,9 +366,9 @@ export default function QuizPage() {
                       <div className="w-20 h-20 mx-auto bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-amber-500/30 mb-6">
                         <Zap className="w-10 h-10 text-white" />
                       </div>
-                      <h2 className="text-2xl font-bold text-navy-900 dark:text-white mb-2">Bilgi YarÄ±ÅŸmasÄ±</h2>
+                      <h2 className="text-2xl font-bold text-navy-900 dark:text-white mb-2">Bilgi Yarışması</h2>
                       <p className="text-navy-500 dark:text-navy-400 mb-6">
-                        {config?.questionsPerSession || 12} soru Â· {config?.minPlayers || 2}+ oyuncu Â· 7 dakika
+                        {config?.questionsPerSession || 12} soru · {config?.minPlayers || 2}+ oyuncu · 7 dakika
                       </p>
                       <button
                         onClick={createSession}
@@ -376,7 +376,7 @@ export default function QuizPage() {
                         className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg rounded-2xl shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
                       >
                         {loading ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (
-                          <><Play className="w-6 h-6 inline mr-2" />YarÄ±ÅŸma BaÅŸlat</>
+                          <><Play className="w-6 h-6 inline mr-2" />Yarışma Başlat</>
                         )}
                       </button>
                     </div>
@@ -384,7 +384,7 @@ export default function QuizPage() {
 
                   {results && results.participants && (
                     <div className="mt-8 pt-6 border-t border-navy-100 dark:border-navy-700">
-                      <h3 className="text-lg font-bold text-navy-900 dark:text-white mb-3">Son YarÄ±ÅŸma SonuÃ§larÄ±</h3>
+                      <h3 className="text-lg font-bold text-navy-900 dark:text-white mb-3">Son Yarışma Sonuçları</h3>
                       <div className="flex justify-center gap-4">
                         {results.participants.slice(0, 3).map((p: Participant, i: number) => (
                           <div key={p.id} className={`text-center p-4 rounded-xl ${
@@ -392,7 +392,7 @@ export default function QuizPage() {
                             i === 1 ? 'bg-gray-50 dark:bg-gray-500/10' :
                             'bg-orange-50 dark:bg-orange-500/10'
                           }`}>
-                            <div className="text-3xl mb-1">{['ğŸ¥‡', 'ğŸ¥ˆ', 'ğŸ¥‰'][i]}</div>
+                            <div className="text-3xl mb-1">{['g���', 'g���', 'g���'][i]}</div>
                             <div className="font-bold text-navy-900 dark:text-white">{p.user_name}</div>
                             <div className="text-sm text-amber-600 dark:text-amber-400 font-medium">{p.score.toLocaleString()} puan</div>
                           </div>
@@ -413,8 +413,8 @@ export default function QuizPage() {
                       {(session.participants?.length || 0) < (config?.minPlayers || 2)
                         ? `En az ${config?.minPlayers || 2} oyuncu gerekli (${session.participants?.length || 0}/${config?.minPlayers || 2})`
                         : session.participants?.every(p => p.is_ready)
-                          ? 'Herkes hazÄ±r! YarÄ±ÅŸma baÅŸlÄ±yor...'
-                          : 'Herkesin hazÄ±r olmasÄ±nÄ± bekleniyor...'}
+                          ? 'Herkes hazır! Yarışma başlıyor...'
+                          : 'Herkesin hazır olmasını bekleniyor...'}
                     </p>
                   </div>
 
@@ -438,7 +438,7 @@ export default function QuizPage() {
                         </div>
                         <div className="text-sm font-medium text-navy-900 dark:text-white truncate">{p.user_name}</div>
                         <div className={`text-xs mt-0.5 ${p.is_ready ? 'text-emerald-600 dark:text-emerald-400' : 'text-navy-400'}`}>
-                          {p.is_ready ? 'HazÄ±r âœ“' : 'Bekliyor...'}
+                          {p.is_ready ? 'Hazır ✓' : 'Bekliyor...'}
                         </div>
                       </div>
                     ))}
@@ -460,7 +460,7 @@ export default function QuizPage() {
                         disabled={loading}
                         className="px-8 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-all disabled:opacity-50"
                       >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'KatÄ±l'}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Katıl'}
                       </button>
                     ) : (
                       <button
@@ -472,9 +472,9 @@ export default function QuizPage() {
                         }`}
                       >
                         {session.participants?.find(p => p.user_name === userName)?.is_ready ? (
-                          <><XCircle className="w-5 h-5 inline mr-2" />HazÄ±r DeÄŸilim</>
+                          <><XCircle className="w-5 h-5 inline mr-2" />Hazır Değilim</>
                         ) : (
-                          <><Check className="w-5 h-5 inline mr-2" />HazÄ±rÄ±m</>
+                          <><Check className="w-5 h-5 inline mr-2" />Hazırım</>
                         )}
                       </button>
                     )}
@@ -484,7 +484,7 @@ export default function QuizPage() {
                   {session.participants && session.participants.length >= (config?.minPlayers || 2) && (
                     <div className="mt-4">
                       <div className="flex justify-between text-xs text-navy-500 dark:text-navy-400 mb-1">
-                        <span>HazÄ±r olan oyuncular</span>
+                        <span>Hazır olan oyuncular</span>
                         <span>{session.participants.filter(p => p.is_ready).length}/{session.participants.length}</span>
                       </div>
                       <div className="h-2 bg-navy-100 dark:bg-navy-800 rounded-full overflow-hidden">
@@ -505,15 +505,15 @@ export default function QuizPage() {
                   {!isInSession && (
                     <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 dark:from-purple-500/20 dark:to-indigo-500/20 border border-purple-300 dark:border-purple-500/30 rounded-2xl p-4 flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-navy-900 dark:text-white">YarÄ±ÅŸma devam ediyor!</p>
-                        <p className="text-sm text-navy-500 dark:text-navy-400">GeÃ§ katÄ±lÄ±m ile hÃ¢lÃ¢ katÄ±labilirsin</p>
+                        <p className="font-bold text-navy-900 dark:text-white">Yarışma devam ediyor!</p>
+                        <p className="text-sm text-navy-500 dark:text-navy-400">Geç katılım ile hâlâ katılabilirsin</p>
                       </div>
                       <button
                         onClick={joinSession}
                         disabled={loading}
                         className="px-6 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 hover:scale-105 transition-all disabled:opacity-50"
                       >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'GeÃ§ KatÄ±l'}
+                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Geç Katıl'}
                       </button>
                     </div>
                   )}
@@ -527,7 +527,7 @@ export default function QuizPage() {
                       </span>
                       {allAnswered && !answerResult && (
                         <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-medium animate-pulse">
-                          Herkes cevapladÄ±!
+                          Herkes cevapladı!
                         </span>
                       )}
                     </div>
@@ -536,7 +536,7 @@ export default function QuizPage() {
                     }`}>
                       <Timer className="w-5 h-5" />
                       {showReveal ? (
-                        <span className="text-emerald-500">SonuÃ§lar</span>
+                        <span className="text-emerald-500">Sonuçlar</span>
                       ) : (
                         <span>{timeLeft}s</span>
                       )}
@@ -650,8 +650,8 @@ export default function QuizPage() {
                           : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400'
                       }`}>
                         {answerResult.correct
-                          ? `ğŸ‰ DoÄŸru! +${answerResult.score} puan`
-                          : 'âŒ YanlÄ±ÅŸ!'}
+                          ? `g�?� Doğru! +${answerResult.score} puan`
+                          : '❌ Yanlış!'}
                       </div>
                     )}
                   </div>
@@ -660,7 +660,7 @@ export default function QuizPage() {
                   <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 p-4">
                     <h3 className="text-sm font-bold text-navy-900 dark:text-white mb-2 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-500" />
-                      CanlÄ± Skor
+                      Canlı Skor
                     </h3>
                     <div className="space-y-1.5">
                       {session.participants?.sort((a, b) => b.score - a.score).map((p, i) => {
@@ -689,8 +689,8 @@ export default function QuizPage() {
               {session && session.status === 'finished' && session.participants && (
                 <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 p-8 text-center">
                   <div className="mb-6">
-                    <div className="text-6xl mb-3">ğŸ†</div>
-                    <h2 className="text-2xl font-bold text-navy-900 dark:text-white">YarÄ±ÅŸma Bitti!</h2>
+                    <div className="text-6xl mb-3">g���</div>
+                    <h2 className="text-2xl font-bold text-navy-900 dark:text-white">Yarışma Bitti!</h2>
                   </div>
                   <div className="flex justify-center gap-6 mb-6">
                     {session.participants.sort((a, b) => (a.rank || 99) - (b.rank || 99)).slice(0, 3).map((p, i) => (
@@ -700,7 +700,7 @@ export default function QuizPage() {
                         'bg-gradient-to-b from-orange-100 to-amber-50 dark:from-orange-500/20 dark:to-amber-500/10 border border-orange-300 dark:border-orange-500/30'
                       }`}>
                         <div className="text-4xl mb-2">{i === 0 ? <Crown className="w-10 h-10 mx-auto text-amber-500" /> : i === 1 ? <Medal className="w-8 h-8 mx-auto text-gray-500" /> : <Award className="w-8 h-8 mx-auto text-orange-500" />}</div>
-                        <div className="text-xs text-navy-500 dark:text-navy-400 mb-1">{i + 1}. SÄ±ra</div>
+                        <div className="text-xs text-navy-500 dark:text-navy-400 mb-1">{i + 1}. Sıra</div>
                         <div className="font-bold text-lg text-navy-900 dark:text-white">{p.user_name}</div>
                         <div className="text-amber-600 dark:text-amber-400 font-bold">{p.score.toLocaleString()}</div>
                       </div>
@@ -722,7 +722,7 @@ export default function QuizPage() {
               </div>
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
                 {chatMessages.length === 0 && (
-                  <p className="text-xs text-center text-navy-400 dark:text-navy-500 mt-4">HenÃ¼z mesaj yok</p>
+                  <p className="text-xs text-center text-navy-400 dark:text-navy-500 mt-4">Henüz mesaj yok</p>
                 )}
                 {chatMessages.map((msg, i) => (
                   <div key={i} className={`${msg.user_name === userName ? 'text-right' : ''}`}>

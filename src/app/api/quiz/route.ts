@@ -191,11 +191,11 @@ export async function POST(req: Request) {
         const finishedAt = new Date(lastFinished[0].finished_at);
         const cooldownEnd = new Date(finishedAt.getTime() + COOLDOWN_MINUTES * 60 * 1000);
         if (new Date() < cooldownEnd) {
-          return NextResponse.json({ error: 'Bekleme sÃ¼resi dolmadÄ±', cooldownEndsAt: cooldownEnd.toISOString() }, { status: 400 });
+          return NextResponse.json({ error: 'Bekleme süresi dolmadı', cooldownEndsAt: cooldownEnd.toISOString() }, { status: 400 });
         }
       }
       const existing = await sql`SELECT id FROM quiz_sessions WHERE status IN ('waiting', 'active') LIMIT 1`;
-      if (existing.length > 0) return NextResponse.json({ error: 'Zaten aktif bir yarÄ±ÅŸma var' }, { status: 400 });
+      if (existing.length > 0) return NextResponse.json({ error: 'Zaten aktif bir yarışma var' }, { status: 400 });
 
       const result = await sql`INSERT INTO quiz_sessions (status) VALUES ('waiting') RETURNING id`;
       const newId = result[0].id;
@@ -208,7 +208,7 @@ export async function POST(req: Request) {
     if (action === 'join') {
       if (!userName || !sessionId) return NextResponse.json({ error: 'Eksik parametre' }, { status: 400 });
       const sessions = await sql`SELECT id, status FROM quiz_sessions WHERE id = ${sessionId} AND status IN ('waiting', 'active')`;
-      if (sessions.length === 0) return NextResponse.json({ error: 'YarÄ±ÅŸma bulunamadÄ± veya bitmiÅŸ' }, { status: 400 });
+      if (sessions.length === 0) return NextResponse.json({ error: 'Yarışma bulunamadı veya bitmiş' }, { status: 400 });
       await sql`INSERT INTO quiz_participants (session_id, user_name) VALUES (${sessionId}, ${userName}) ON CONFLICT (session_id, user_name) DO NOTHING`;
       const cnt = await sql`SELECT COUNT(*) as cnt FROM quiz_participants WHERE session_id = ${sessionId}`;
       return NextResponse.json({ joined: true, playerCount: parseInt(cnt[0].cnt) });
@@ -229,21 +229,21 @@ export async function POST(req: Request) {
     if (action === 'answer') {
       if (!sessionId || !userName || !selectedOption || !questionNumber) return NextResponse.json({ error: 'Eksik parametre' }, { status: 400 });
       const sessions = await sql`SELECT * FROM quiz_sessions WHERE id = ${sessionId} AND status = 'active'`;
-      if (sessions.length === 0) return NextResponse.json({ error: 'Aktif yarÄ±ÅŸma yok' }, { status: 400 });
+      if (sessions.length === 0) return NextResponse.json({ error: 'Aktif yarışma yok' }, { status: 400 });
       const s = sessions[0];
 
       const parts = await sql`SELECT id FROM quiz_participants WHERE session_id = ${sessionId} AND user_name = ${userName}`;
-      if (parts.length === 0) return NextResponse.json({ error: 'KatÄ±lÄ±mcÄ± deÄŸilsiniz' }, { status: 400 });
+      if (parts.length === 0) return NextResponse.json({ error: 'Katılımcı değilsiniz' }, { status: 400 });
       const pid = parts[0].id;
 
       const dup = await sql`SELECT id FROM quiz_answers WHERE session_id = ${sessionId} AND participant_id = ${pid} AND question_number = ${questionNumber}`;
-      if (dup.length > 0) return NextResponse.json({ error: 'Zaten cevaplandÄ±' }, { status: 400 });
+      if (dup.length > 0) return NextResponse.json({ error: 'Zaten cevaplandı' }, { status: 400 });
 
       const qIds = s.question_ids;
-      if (questionNumber - 1 >= qIds.length) return NextResponse.json({ error: 'GeÃ§ersiz soru' }, { status: 400 });
+      if (questionNumber - 1 >= qIds.length) return NextResponse.json({ error: 'Geçersiz soru' }, { status: 400 });
       const qId = qIds[questionNumber - 1];
       const qs = await sql`SELECT correct_option FROM quiz_questions WHERE id = ${qId}`;
-      if (qs.length === 0) return NextResponse.json({ error: 'Soru bulunamadÄ±' }, { status: 400 });
+      if (qs.length === 0) return NextResponse.json({ error: 'Soru bulunamadı' }, { status: 400 });
 
       const isCorrect = selectedOption.toUpperCase() === qs[0].correct_option;
       let score = 0;
@@ -261,7 +261,7 @@ export async function POST(req: Request) {
     if (action === 'chat') {
       if (!userName || !sessionId || !message) return NextResponse.json({ error: 'Eksik parametre' }, { status: 400 });
       const cleanMsg = String(message).slice(0, 200).trim();
-      if (!cleanMsg) return NextResponse.json({ error: 'BoÅŸ mesaj' }, { status: 400 });
+      if (!cleanMsg) return NextResponse.json({ error: 'Boş mesaj' }, { status: 400 });
       await sql`INSERT INTO quiz_chat (session_id, user_name, message) VALUES (${sessionId}, ${userName}, ${cleanMsg})`;
       return NextResponse.json({ sent: true });
     }
