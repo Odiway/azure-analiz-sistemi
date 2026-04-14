@@ -6,7 +6,7 @@ const QUESTIONS_PER_SESSION = 6;
 const QUESTION_TIME_SECONDS = 30;
 const REVEAL_TIME_SECONDS = 5;
 const LOBBY_COUNTDOWN_SECONDS = 15;
-const MIN_PLAYERS = 3;
+const MIN_PLAYERS = 2;
 const THREE_MONTHS_AGO = 90; // days
 
 export async function GET(req: Request) {
