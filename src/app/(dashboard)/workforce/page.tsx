@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Users, ChevronLeft, ChevronRight, Filter, BarChart3,
   Calendar, Briefcase, Activity, Zap, Target, Clock,
-  Award, TrendingUp, X, Check, Loader2,
+  Award, TrendingUp, X, Check, Loader2, Download,
 } from 'lucide-react';
 
 // ===================== TYPES =====================
@@ -160,8 +160,8 @@ export default function WorkforcePage() {
   const [saving, setSaving] = useState(false);
   // Pending changes: key = `${rowIndex}_${week}` -> value (1 or 0)
   const [pendingChanges, setPendingChanges] = useState<Record<string, { rowIndex: number; week: number; value: number }>>({});
-  // Data arrived marks from DB: key = `${rowIndex}_${week}`
-  const [dataArrived, setDataArrived] = useState<Record<string, boolean>>({});
+  // Data arrived marks from DB: key = `${rowIndex}_${week}` -> ISO date string
+  const [dataArrived, setDataArrived] = useState<Record<string, string>>({});
   // Pending data arrived changes: key = `${rowIndex}_${week}` -> add/remove
   const [pendingDataArrived, setPendingDataArrived] = useState<Record<string, { rowIndex: number; week: number; add: boolean }>>({});
   // Cell popup for person/project view: { rowName, week, x, y }
@@ -300,6 +300,290 @@ export default function WorkforcePage() {
     }
   }
 
+  // ===================== EXCEL EXPORT =====================
+  async function exportWorkforceExcel() {
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'TEMSA CAE Departmanı';
+    wb.created = new Date();
+
+    const TEMSA_BLUE = '00529B';
+    const HEADER_WHITE = 'FFFFFF';
+    const BORDER_STYLE = { style: 'thin' as const, color: { argb: 'FFD0D5DD' } };
+    const ALL_BORDERS = { top: BORDER_STYLE, bottom: BORDER_STYLE, left: BORDER_STYLE, right: BORDER_STYLE };
+    const MONTH_HEX = [
+      '2563EB', '0891B2', '0D9488', '059669', '16A34A', '65A30D',
+      'CA8A04', 'D97706', 'EA580C', 'E11D48', 'DB2777', '9333EA',
+    ];
+    const MONTH_LIGHT_HEX = [
+      'DBEAFE', 'CFFAFE', 'CCFBF1', 'D1FAE5', 'DCFCE7', 'ECFCCB',
+      'FEF9C3', 'FEF3C7', 'FFEDD5', 'FFE4E6', 'FCE7F3', 'F3E8FF',
+    ];
+
+    // ---- Sheet 1: İş Gücü Planı ----
+    const ws = wb.addWorksheet('İş Gücü Planı', {
+      views: [{ state: 'frozen', xSplit: 6, ySplit: 3 }],
+    });
+
+    // Row 1: Month headers
+    const monthRow = ws.getRow(1);
+    monthRow.height = 22;
+    for (let c = 1; c <= 6; c++) {
+      const cell = monthRow.getCell(c);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A202C' } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = ALL_BORDERS;
+    }
+    monthRow.getCell(1).value = 'TEMSA CAE';
+    monthRow.getCell(2).value = `İş Gücü ${year}`;
+
+    let colOffset = 7;
+    for (const mg of monthGroups) {
+      const startCol = colOffset;
+      const endCol = colOffset + mg.weeks.length - 1;
+      for (let c = startCol; c <= endCol; c++) {
+        const cell = monthRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_HEX[mg.month]}` } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      }
+      if (mg.weeks.length > 1) ws.mergeCells(1, startCol, 1, endCol);
+      monthRow.getCell(startCol).value = mg.name;
+      colOffset = endCol + 1;
+    }
+
+    // Row 2: Column headers
+    const headerRow = ws.getRow(2);
+    headerRow.height = 24;
+    const fixedHeaders = ['No', 'Analiz Adı', 'Proje', 'Kişi', 'Tip', 'Durum'];
+    fixedHeaders.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+      cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 9 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = ALL_BORDERS;
+    });
+    weeks.forEach((w, i) => {
+      const cell = headerRow.getCell(7 + i);
+      cell.value = `W${w.week}`;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+      cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 8 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = ALL_BORDERS;
+    });
+
+    // Row 3: Date sub-headers
+    const dateRow = ws.getRow(3);
+    dateRow.height = 18;
+    for (let c = 1; c <= 6; c++) {
+      const cell = dateRow.getCell(c);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      cell.border = ALL_BORDERS;
+    }
+    weeks.forEach((w, i) => {
+      const cell = dateRow.getCell(7 + i);
+      cell.value = `${w.monday.getDate()} ${MONTHS_SHORT[w.monday.getMonth()]}`;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
+      cell.font = { size: 7, color: { argb: 'FF475569' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = ALL_BORDERS;
+    });
+
+    // Data rows
+    filteredTasks.forEach((task, idx) => {
+      const row = ws.getRow(4 + idx);
+      row.height = 20;
+      const isEven = idx % 2 === 0;
+      const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
+
+      row.getCell(1).value = task.number;
+      row.getCell(2).value = task.name;
+      row.getCell(3).value = task.project;
+      row.getCell(4).value = task.caeResp;
+      row.getCell(5).value = task.type;
+      row.getCell(6).value = task.status;
+
+      for (let c = 1; c <= 6; c++) {
+        const cell = row.getCell(c);
+        cell.font = { size: 9, color: { argb: 'FF1E293B' } };
+        cell.alignment = { vertical: 'middle', wrapText: c === 2 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.border = ALL_BORDERS;
+      }
+      row.getCell(1).font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+
+      weeks.forEach((w, wi) => {
+        const cell = row.getCell(7 + wi);
+        const val = task.weeks[w.week];
+        const isDA = !!dataArrived[`${task.rowIndex}_${w.week}`];
+        cell.value = val || null;
+        if (val) {
+          if (isDA) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7AA' } }; // orange-200
+            cell.font = { size: 9, bold: true, color: { argb: 'FF9A3412' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
+            cell.font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+          }
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+    });
+
+    // Column widths
+    ws.getColumn(1).width = 8;
+    ws.getColumn(2).width = 32;
+    ws.getColumn(3).width = 18;
+    ws.getColumn(4).width = 16;
+    ws.getColumn(5).width = 14;
+    ws.getColumn(6).width = 14;
+    for (let i = 0; i < weeks.length; i++) ws.getColumn(7 + i).width = 7;
+
+    // ---- Sheet 2: Data Geldi Tarihleri ----
+    const ws2 = wb.addWorksheet('Data Geldi Tarihleri', {
+      views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
+    });
+
+    // Header
+    const daHeader = ws2.getRow(1);
+    daHeader.height = 26;
+    const daHeaders = ['Analiz Adı', 'Proje', 'Kişi', 'Tip', 'Hafta', 'Hafta Başlangıcı', 'Data Geldi Tarihi'];
+    daHeaders.forEach((h, i) => {
+      const cell = daHeader.getCell(i + 1);
+      cell.value = h;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' } }; // orange
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = ALL_BORDERS;
+    });
+
+    // Collect all data_arrived entries
+    const daEntries: { task: WorkforceTask; week: number; date: string }[] = [];
+    for (const task of filteredTasks) {
+      for (const w of weeks) {
+        const key = `${task.rowIndex}_${w.week}`;
+        if (dataArrived[key]) {
+          daEntries.push({ task, week: w.week, date: dataArrived[key] });
+        }
+      }
+    }
+
+    // Sort by date descending (newest first)
+    daEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    daEntries.forEach((entry, idx) => {
+      const row = ws2.getRow(2 + idx);
+      row.height = 22;
+      const isEven = idx % 2 === 0;
+      const rowBg = isEven ? 'FFFFFFFF' : 'FFFFF7ED'; // white / orange-50
+
+      const weekInfo = weeks.find(w => w.week === entry.week);
+      const mondayStr = weekInfo ? `${weekInfo.monday.getDate()} ${MONTHS_TR[weekInfo.monday.getMonth()]} ${weekInfo.monday.getFullYear()}` : '';
+      const dateObj = new Date(entry.date);
+      const dateStr = `${dateObj.getDate()} ${MONTHS_TR[dateObj.getMonth()]} ${dateObj.getFullYear()} ${String(dateObj.getHours()).padStart(2, '0')}:${String(dateObj.getMinutes()).padStart(2, '0')}`;
+
+      row.getCell(1).value = entry.task.name;
+      row.getCell(2).value = entry.task.project;
+      row.getCell(3).value = entry.task.caeResp;
+      row.getCell(4).value = entry.task.type;
+      row.getCell(5).value = `W${entry.week}`;
+      row.getCell(6).value = mondayStr;
+      row.getCell(7).value = dateStr;
+
+      for (let c = 1; c <= 7; c++) {
+        const cell = row.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        cell.font = { size: 10, color: { argb: 'FF1E293B' } };
+        cell.alignment = { horizontal: c <= 4 ? 'left' : 'center', vertical: 'middle', wrapText: c === 1 };
+        cell.border = ALL_BORDERS;
+      }
+      row.getCell(1).font = { size: 10, bold: true, color: { argb: 'FF1E293B' } };
+      row.getCell(7).font = { size: 10, bold: true, color: { argb: 'FFC2410C' } }; // orange-700
+    });
+
+    if (daEntries.length === 0) {
+      const row = ws2.getRow(2);
+      row.getCell(1).value = 'Henüz data geldi işareti yok';
+      row.getCell(1).font = { size: 10, italic: true, color: { argb: 'FF9CA3AF' } };
+    }
+
+    ws2.getColumn(1).width = 35;
+    ws2.getColumn(2).width = 18;
+    ws2.getColumn(3).width = 16;
+    ws2.getColumn(4).width = 14;
+    ws2.getColumn(5).width = 10;
+    ws2.getColumn(6).width = 22;
+    ws2.getColumn(7).width = 24;
+
+    // ---- Sheet 3: Kişi Özeti ----
+    const ws3 = wb.addWorksheet('Kişi Özeti');
+    const pHeader = ws3.getRow(1);
+    pHeader.height = 26;
+    ['Kişi', 'Analiz Sayısı', 'Proje Sayısı', 'Data Gelen Analiz'].forEach((h, i) => {
+      const cell = pHeader.getCell(i + 1);
+      cell.value = h;
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = ALL_BORDERS;
+    });
+
+    sortedPeople.forEach((p, idx) => {
+      const row = ws3.getRow(2 + idx);
+      row.height = 22;
+      const isEven = idx % 2 === 0;
+      const personTasks = filteredTasks.filter(t => t.caeResp === p.name);
+      const personProjects = new Set(personTasks.map(t => t.project));
+
+      // Count unique tasks that have at least one data_arrived mark
+      const tasksWithData = new Set<number>();
+      for (const t of personTasks) {
+        for (const w of weeks) {
+          if (dataArrived[`${t.rowIndex}_${w.week}`]) {
+            tasksWithData.add(t.rowIndex);
+            break;
+          }
+        }
+      }
+
+      row.getCell(1).value = p.name;
+      row.getCell(2).value = personTasks.length;
+      row.getCell(3).value = personProjects.size;
+      row.getCell(4).value = tasksWithData.size;
+
+      for (let c = 1; c <= 4; c++) {
+        const cell = row.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFFFFFFF' : 'FFF1F5F9' } };
+        cell.font = { size: 10, color: { argb: 'FF1E293B' } };
+        cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      }
+      row.getCell(1).font = { size: 10, bold: true, color: { argb: 'FF1E293B' } };
+      row.getCell(4).font = { size: 10, bold: true, color: { argb: 'FFC2410C' } };
+    });
+
+    ws3.getColumn(1).width = 20;
+    ws3.getColumn(2).width = 16;
+    ws3.getColumn(3).width = 14;
+    ws3.getColumn(4).width = 18;
+
+    // Export
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TEMSA_CAE_Is_Gucu_Plani_${year}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Close popup on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -350,7 +634,7 @@ export default function WorkforcePage() {
       if (isCurrentlyArrived) {
         delete next[key];
       } else {
-        next[key] = true;
+        next[key] = new Date().toISOString();
       }
       return next;
     });
@@ -512,6 +796,14 @@ export default function WorkforcePage() {
           >
             <Calendar className="w-3.5 h-3.5" />
             Bu Hafta
+          </button>
+
+          <button
+            onClick={exportWorkforceExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Excel
           </button>
         </div>
       </div>

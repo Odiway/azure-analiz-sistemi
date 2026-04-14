@@ -152,11 +152,11 @@ export async function GET() {
     const tasks = await applyOverrides(baseTasks);
     const { people, projects } = buildSummary(tasks);
 
-    // Load data_arrived marks
-    const daRows = await sql('SELECT row_index, week FROM workforce_data_arrived');
-    const dataArrived: Record<string, boolean> = {};
+    // Load data_arrived marks with dates
+    const daRows = await sql('SELECT row_index, week, created_at FROM workforce_data_arrived');
+    const dataArrived: Record<string, string> = {};
     for (const r of daRows) {
-      dataArrived[`${r.row_index}_${r.week}`] = true;
+      dataArrived[`${r.row_index}_${r.week}`] = r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString();
     }
 
     return NextResponse.json({ tasks, people, projects, dataArrived });
@@ -240,10 +240,10 @@ export async function POST(req: Request) {
     const tasks = await applyOverrides(baseTasks);
     const { people, projects } = buildSummary(tasks);
 
-    const daRows = await sql('SELECT row_index, week FROM workforce_data_arrived');
-    const dataArrived: Record<string, boolean> = {};
+    const daRows = await sql('SELECT row_index, week, created_at FROM workforce_data_arrived');
+    const dataArrived: Record<string, string> = {};
     for (const r of daRows) {
-      dataArrived[`${r.row_index}_${r.week}`] = true;
+      dataArrived[`${r.row_index}_${r.week}`] = r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString();
     }
 
     return NextResponse.json({ tasks, people, projects, dataArrived });
