@@ -160,13 +160,13 @@ export default function QuizPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  const createSession = async () => {
+  const createSession = async (force = false) => {
     setLoading(true);
     try {
       const res = await fetch('/api/quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', userName }),
+        body: JSON.stringify({ action: force ? 'forceCreate' : 'create', userName }),
       });
       if (res.ok) await fetchStatus();
     } finally {
@@ -346,6 +346,17 @@ export default function QuizPage() {
                       <div className="text-4xl font-mono font-bold text-amber-500">
                         {Math.floor(cooldownLeft / 60)}:{(cooldownLeft % 60).toString().padStart(2, '0')}
                       </div>
+                      {userName === 'Oğuzhan İnandı' && (
+                        <button
+                          onClick={() => createSession(true)}
+                          disabled={loading}
+                          className="mt-4 px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+                        >
+                          {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+                            <><Zap className="w-5 h-5 inline mr-1" />Yeniden Başlat</>
+                          )}
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div>
@@ -357,7 +368,7 @@ export default function QuizPage() {
                         {config?.questionsPerSession || 12} soru · {config?.minPlayers || 2}+ oyuncu · 7 dakika
                       </p>
                       <button
-                        onClick={createSession}
+                        onClick={() => createSession()}
                         disabled={loading}
                         className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg rounded-2xl shadow-xl shadow-amber-500/30 hover:shadow-amber-500/50 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
                       >

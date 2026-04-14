@@ -185,6 +185,18 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, userName, sessionId, selectedOption, questionNumber, message } = body;
 
+    if (action === 'forceCreate') {
+      if (userName !== 'Oğuzhan İnandı') return NextResponse.json({ error: 'Yetkiniz yok' }, { status: 403 });
+      const existing = await sql`SELECT id FROM quiz_sessions WHERE status IN ('waiting', 'active') LIMIT 1`;
+      if (existing.length > 0) {
+        await sql`UPDATE quiz_sessions SET status = 'finished', finished_at = NOW() WHERE id = ${existing[0].id}`;
+      }
+      const result = await sql`INSERT INTO quiz_sessions (status) VALUES ('waiting') RETURNING id`;
+      const newId = result[0].id;
+      await sql`INSERT INTO quiz_participants (session_id, user_name) VALUES (${newId}, ${userName}) ON CONFLICT DO NOTHING`;
+      return NextResponse.json({ sessionId: newId });
+    }
+
     if (action === 'create') {
       const lastFinished = await sql`SELECT finished_at FROM quiz_sessions WHERE status = 'finished' ORDER BY finished_at DESC LIMIT 1`;
       if (lastFinished.length > 0 && lastFinished[0].finished_at) {
