@@ -445,13 +445,168 @@ export default function WorkforcePage() {
     ws.getColumn(6).width = 14;
     for (let i = 0; i < weeks.length; i++) ws.getColumn(7 + i).width = 7;
 
-    // ---- Sheet 2: Data Geldi Tarihleri ----
-    const ws2 = wb.addWorksheet('Data Geldi Tarihleri', {
+    // ---- Helper: build person/project calendar sheet ----
+    function buildCalendarSheet(sheetName: string, label: string, rows: string[], weekData: Record<string, Record<number, { count: number; tasks: WorkforceTask[] }>>) {
+      const s = wb.addWorksheet(sheetName, {
+        views: [{ state: 'frozen', xSplit: 2, ySplit: 3 }],
+      });
+
+      // Row 1: Month headers
+      const mRow = s.getRow(1);
+      mRow.height = 22;
+      for (let c = 1; c <= 2; c++) {
+        const cell = mRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A202C' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      }
+      mRow.getCell(1).value = `TEMSA CAE — ${label}`;
+
+      let co = 3;
+      for (const mg of monthGroups) {
+        const sc = co;
+        const ec = co + mg.weeks.length - 1;
+        for (let c = sc; c <= ec; c++) {
+          const cell = mRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_HEX[mg.month]}` } };
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = ALL_BORDERS;
+        }
+        if (mg.weeks.length > 1) s.mergeCells(1, sc, 1, ec);
+        mRow.getCell(sc).value = mg.name;
+        co = ec + 1;
+      }
+
+      // Row 2: Headers
+      const hRow = s.getRow(2);
+      hRow.height = 24;
+      [label, 'Toplam'].forEach((h, i) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = h;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+        cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 9 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+      weeks.forEach((w, i) => {
+        const cell = hRow.getCell(3 + i);
+        cell.value = `W${w.week}`;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+        cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 8 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+
+      // Row 3: Date sub-headers
+      const dRow = s.getRow(3);
+      dRow.height = 18;
+      for (let c = 1; c <= 2; c++) {
+        const cell = dRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        cell.border = ALL_BORDERS;
+      }
+      weeks.forEach((w, i) => {
+        const cell = dRow.getCell(3 + i);
+        cell.value = `${w.monday.getDate()} ${MONTHS_SHORT[w.monday.getMonth()]}`;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
+        cell.font = { size: 7, color: { argb: 'FF475569' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+
+      // Load color mapping
+      const LOAD_COLORS: Record<number, { bg: string; fg: string }> = {
+        1: { bg: 'FFD1FAE5', fg: 'FF065F46' }, // emerald
+        2: { bg: 'FFFEF9C3', fg: 'FF854D0E' }, // yellow
+        3: { bg: 'FFFFEDD5', fg: 'FF9A3412' }, // orange
+      };
+      const LOAD_HIGH = { bg: 'FFFEE2E2', fg: 'FF991B1B' }; // red for 4+
+
+      // Data rows
+      rows.forEach((rowName, idx) => {
+        const row = s.getRow(4 + idx);
+        row.height = 20;
+        const isEven = idx % 2 === 0;
+        const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
+        const wd = weekData[rowName] || {};
+
+        // Total tasks
+        const totalTasks = Object.values(wd).reduce((s, d) => Math.max(s, d.tasks.length), 0);
+        const uniqueTasks = new Set<number>();
+        Object.values(wd).forEach(d => d.tasks.forEach(t => uniqueTasks.add(t.rowIndex)));
+
+        row.getCell(1).value = rowName;
+        row.getCell(1).font = { size: 10, bold: true, color: { argb: 'FF1E293B' } };
+        row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        row.getCell(1).alignment = { vertical: 'middle' };
+        row.getCell(1).border = ALL_BORDERS;
+
+        row.getCell(2).value = uniqueTasks.size;
+        row.getCell(2).font = { size: 10, bold: true, color: { argb: `FF${TEMSA_BLUE}` } };
+        row.getCell(2).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(2).border = ALL_BORDERS;
+
+        weeks.forEach((w, wi) => {
+          const cell = row.getCell(3 + wi);
+          const d = wd[w.week];
+          const load = d?.count || 0;
+          cell.value = load || null;
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = ALL_BORDERS;
+
+          // Check if any task in this cell has data_arrived
+          const hasDA = d?.tasks.some(t => !!dataArrived[`${t.rowIndex}_${w.week}`]);
+
+          if (load > 0 && hasDA) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7AA' } };
+            cell.font = { size: 9, bold: true, color: { argb: 'FF9A3412' } };
+          } else if (load > 0) {
+            const lc = load >= 4 ? LOAD_HIGH : (LOAD_COLORS[load] || LOAD_HIGH);
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lc.bg } };
+            cell.font = { size: 9, bold: true, color: { argb: lc.fg } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+          }
+        });
+      });
+
+      // Total row
+      const tRow = s.getRow(4 + rows.length);
+      tRow.height = 24;
+      tRow.getCell(1).value = 'TOPLAM';
+      tRow.getCell(2).value = filteredTasks.length;
+      weeks.forEach((w, i) => {
+        tRow.getCell(3 + i).value = weekTotalLoad[w.week] || null;
+      });
+      for (let c = 1; c <= 2 + weeks.length; c++) {
+        const cell = tRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A202C' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+        cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      }
+
+      s.getColumn(1).width = 22;
+      s.getColumn(2).width = 10;
+      for (let i = 0; i < weeks.length; i++) s.getColumn(3 + i).width = 7;
+    }
+
+    // ---- Sheet 2: Kişi Bazlı ----
+    buildCalendarSheet('Kişi Bazlı', 'CAE Mühendisi', sortedPeople.map(p => p.name), personWeekLoad);
+
+    // ---- Sheet 3: Proje Bazlı ----
+    buildCalendarSheet('Proje Bazlı', 'Proje', projects, projectWeekLoad);
+
+    // ---- Sheet 4: Data Geldi Tarihleri ----
+    const wsDa = wb.addWorksheet('Data Geldi Tarihleri', {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
 
     // Header
-    const daHeader = ws2.getRow(1);
+    const daHeader = wsDa.getRow(1);
     daHeader.height = 26;
     const daHeaders = ['Analiz Adı', 'Proje', 'Kişi', 'Tip', 'Hafta', 'Hafta Başlangıcı', 'Data Geldi Tarihi'];
     daHeaders.forEach((h, i) => {
@@ -478,7 +633,7 @@ export default function WorkforcePage() {
     daEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     daEntries.forEach((entry, idx) => {
-      const row = ws2.getRow(2 + idx);
+      const row = wsDa.getRow(2 + idx);
       row.height = 22;
       const isEven = idx % 2 === 0;
       const rowBg = isEven ? 'FFFFFFFF' : 'FFFFF7ED'; // white / orange-50
@@ -508,20 +663,20 @@ export default function WorkforcePage() {
     });
 
     if (daEntries.length === 0) {
-      const row = ws2.getRow(2);
+      const row = wsDa.getRow(2);
       row.getCell(1).value = 'Henüz data geldi işareti yok';
       row.getCell(1).font = { size: 10, italic: true, color: { argb: 'FF9CA3AF' } };
     }
 
-    ws2.getColumn(1).width = 35;
-    ws2.getColumn(2).width = 18;
-    ws2.getColumn(3).width = 16;
-    ws2.getColumn(4).width = 14;
-    ws2.getColumn(5).width = 10;
-    ws2.getColumn(6).width = 22;
-    ws2.getColumn(7).width = 24;
+    wsDa.getColumn(1).width = 35;
+    wsDa.getColumn(2).width = 18;
+    wsDa.getColumn(3).width = 16;
+    wsDa.getColumn(4).width = 14;
+    wsDa.getColumn(5).width = 10;
+    wsDa.getColumn(6).width = 22;
+    wsDa.getColumn(7).width = 24;
 
-    // ---- Sheet 3: Kişi Özeti ----
+    // ---- Sheet 5: Kişi Özeti ----
     const ws3 = wb.addWorksheet('Kişi Özeti');
     const pHeader = ws3.getRow(1);
     pHeader.height = 26;
