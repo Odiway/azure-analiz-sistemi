@@ -320,8 +320,8 @@ export default function WorkforcePage() {
       'FEF9C3', 'FEF3C7', 'FFEDD5', 'FFE4E6', 'FCE7F3', 'F3E8FF',
     ];
 
-    // ---- Sheet 1: Gantt ----
-    const ws = wb.addWorksheet('Gantt', {
+    // ---- Sheet 1: İş Gücü Planı (detaylı) ----
+    const ws = wb.addWorksheet('İş Gücü Planı', {
       views: [{ state: 'frozen', xSplit: 6, ySplit: 3 }],
     });
 
@@ -331,105 +331,161 @@ export default function WorkforcePage() {
       PROJ_HEX[k] = v.replace('#', '');
     }
 
-    // Row 1: Month headers
-    const monthRow = ws.getRow(1);
-    monthRow.height = 22;
-    for (let c = 1; c <= 6; c++) {
-      const cell = monthRow.getCell(c);
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A202C' } };
-      cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = ALL_BORDERS;
-    }
-    monthRow.getCell(1).value = 'TEMSA CAE';
-    monthRow.getCell(2).value = `İş Gücü ${year}`;
-
-    let colOffset = 7;
-    for (const mg of monthGroups) {
-      const startCol = colOffset;
-      const endCol = colOffset + mg.weeks.length - 1;
-      for (let c = startCol; c <= endCol; c++) {
-        const cell = monthRow.getCell(c);
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_HEX[mg.month]}` } };
-        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+    // Helper: build month header + week header + date row for a task-level sheet
+    function buildTaskSheetHeaders(s: any, title: string) {
+      const mRow = s.getRow(1);
+      mRow.height = 22;
+      for (let c = 1; c <= 6; c++) {
+        const cell = mRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A202C' } };
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
         cell.alignment = { horizontal: 'center', vertical: 'middle' };
         cell.border = ALL_BORDERS;
       }
-      if (mg.weeks.length > 1) ws.mergeCells(1, startCol, 1, endCol);
-      monthRow.getCell(startCol).value = mg.name;
-      colOffset = endCol + 1;
-    }
+      mRow.getCell(1).value = 'TEMSA CAE';
+      mRow.getCell(2).value = title;
 
-    // Row 2: Column headers
-    const headerRow = ws.getRow(2);
-    headerRow.height = 24;
-    const fixedHeaders = ['No', 'Analiz Adı', 'Proje', 'Kişi', 'Tip', 'Durum'];
-    fixedHeaders.forEach((h, i) => {
-      const cell = headerRow.getCell(i + 1);
-      cell.value = h;
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
-      cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 9 };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = ALL_BORDERS;
-    });
-    weeks.forEach((w, i) => {
-      const cell = headerRow.getCell(7 + i);
-      cell.value = `W${w.week}`;
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
-      cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 8 };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = ALL_BORDERS;
-    });
+      let co = 7;
+      for (const mg of monthGroups) {
+        const sc = co;
+        const ec = co + mg.weeks.length - 1;
+        for (let c = sc; c <= ec; c++) {
+          const cell = mRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_HEX[mg.month]}` } };
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 9 };
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          cell.border = ALL_BORDERS;
+        }
+        if (mg.weeks.length > 1) s.mergeCells(1, sc, 1, ec);
+        mRow.getCell(sc).value = mg.name;
+        co = ec + 1;
+      }
 
-    // Row 3: Date sub-headers
-    const dateRow = ws.getRow(3);
-    dateRow.height = 18;
-    for (let c = 1; c <= 6; c++) {
-      const cell = dateRow.getCell(c);
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
-      cell.border = ALL_BORDERS;
-    }
-    weeks.forEach((w, i) => {
-      const cell = dateRow.getCell(7 + i);
-      cell.value = `${w.monday.getDate()} ${MONTHS_SHORT[w.monday.getMonth()]}`;
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
-      cell.font = { size: 7, color: { argb: 'FF475569' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.border = ALL_BORDERS;
-    });
+      const hRow = s.getRow(2);
+      hRow.height = 24;
+      ['No', 'Analiz Adı', 'Proje', 'Kişi', 'Tip', 'Durum'].forEach((h: string, i: number) => {
+        const cell = hRow.getCell(i + 1);
+        cell.value = h;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+        cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 9 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = ALL_BORDERS;
+      });
+      weeks.forEach((w, i) => {
+        const cell = hRow.getCell(7 + i);
+        cell.value = `W${w.week}`;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${TEMSA_BLUE}` } };
+        cell.font = { bold: true, color: { argb: `FF${HEADER_WHITE}` }, size: 8 };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
 
-    // Data rows
-    filteredTasks.forEach((task, idx) => {
-      const row = ws.getRow(4 + idx);
-      row.height = 20;
-      const isEven = idx % 2 === 0;
-      const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
-
-      row.getCell(1).value = task.number;
-      row.getCell(2).value = task.name;
-      row.getCell(3).value = task.project;
-      row.getCell(4).value = task.caeResp;
-      row.getCell(5).value = task.type;
-      row.getCell(6).value = task.status;
-
+      const dRow = s.getRow(3);
+      dRow.height = 18;
       for (let c = 1; c <= 6; c++) {
-        const cell = row.getCell(c);
-        cell.font = { size: 9, color: { argb: 'FF1E293B' } };
-        cell.alignment = { vertical: 'middle', wrapText: c === 2 };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        const cell = dRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
         cell.border = ALL_BORDERS;
       }
-      row.getCell(1).font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+      weeks.forEach((w, i) => {
+        const cell = dRow.getCell(7 + i);
+        cell.value = `${w.monday.getDate()} ${MONTHS_SHORT[w.monday.getMonth()]}`;
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
+        cell.font = { size: 7, color: { argb: 'FF475569' } };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+    }
+
+    // Helper: build fixed columns for task rows
+    function buildTaskFixedCols(s: any, startRow: number) {
+      filteredTasks.forEach((task, idx) => {
+        const row = s.getRow(startRow + idx);
+        row.height = 20;
+        const isEven = idx % 2 === 0;
+        const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
+
+        row.getCell(1).value = task.number;
+        row.getCell(2).value = task.name;
+        row.getCell(3).value = task.project;
+        row.getCell(4).value = task.caeResp;
+        row.getCell(5).value = task.type;
+        row.getCell(6).value = task.status;
+
+        for (let c = 1; c <= 6; c++) {
+          const cell = row.getCell(c);
+          cell.font = { size: 9, color: { argb: 'FF1E293B' } };
+          cell.alignment = { vertical: 'middle', wrapText: c === 2 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+          cell.border = ALL_BORDERS;
+        }
+        row.getCell(1).font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+      });
+    }
+
+    function setTaskSheetWidths(s: any) {
+      s.getColumn(1).width = 8;
+      s.getColumn(2).width = 32;
+      s.getColumn(3).width = 18;
+      s.getColumn(4).width = 16;
+      s.getColumn(5).width = 14;
+      s.getColumn(6).width = 14;
+      for (let i = 0; i < weeks.length; i++) s.getColumn(7 + i).width = 7;
+    }
+
+    // Build Sheet 1 headers + fixed cols
+    buildTaskSheetHeaders(ws, `İş Gücü ${year}`);
+    buildTaskFixedCols(ws, 4);
+
+    // Sheet 1: week cells with values (detailed view)
+    filteredTasks.forEach((task, idx) => {
+      const row = ws.getRow(4 + idx);
+      const isEven = idx % 2 === 0;
+      const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
 
       weeks.forEach((w, wi) => {
         const cell = row.getCell(7 + wi);
         const val = task.weeks[w.week];
         const isDA = !!dataArrived[`${task.rowIndex}_${w.week}`];
-        const projHex = PROJ_HEX[task.project] || '6B7280';
+        cell.value = val || null;
+        if (val) {
+          if (isDA) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7AA' } };
+            cell.font = { size: 9, bold: true, color: { argb: 'FF9A3412' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
+            cell.font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+          }
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+        }
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border = ALL_BORDERS;
+      });
+    });
+    setTaskSheetWidths(ws);
+
+    // ---- Sheet 2: Gantt (proje renkli barlar) ----
+    const wsGantt = wb.addWorksheet('Gantt', {
+      views: [{ state: 'frozen', xSplit: 6, ySplit: 3 }],
+    });
+    buildTaskSheetHeaders(wsGantt, `Gantt ${year}`);
+    buildTaskFixedCols(wsGantt, 4);
+
+    filteredTasks.forEach((task, idx) => {
+      const row = wsGantt.getRow(4 + idx);
+      const isEven = idx % 2 === 0;
+      const rowBg = isEven ? 'FFFFFFFF' : 'FFF8FAFC';
+      const projHex = PROJ_HEX[task.project] || '6B7280';
+
+      weeks.forEach((w, wi) => {
+        const cell = row.getCell(7 + wi);
+        const val = task.weeks[w.week];
+        const isDA = !!dataArrived[`${task.rowIndex}_${w.week}`];
         if (val) {
           cell.value = '';
           if (isDA) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' } }; // orange
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' } };
             cell.font = { size: 7, color: { argb: 'FFFFFFFF' } };
           } else {
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${projHex}` } };
@@ -442,15 +498,7 @@ export default function WorkforcePage() {
         cell.border = ALL_BORDERS;
       });
     });
-
-    // Column widths
-    ws.getColumn(1).width = 8;
-    ws.getColumn(2).width = 32;
-    ws.getColumn(3).width = 18;
-    ws.getColumn(4).width = 16;
-    ws.getColumn(5).width = 14;
-    ws.getColumn(6).width = 14;
-    for (let i = 0; i < weeks.length; i++) ws.getColumn(7 + i).width = 7;
+    setTaskSheetWidths(wsGantt);
 
     // ---- Helper: build person/project calendar sheet ----
     function buildCalendarSheet(sheetName: string, label: string, rows: string[], weekData: Record<string, Record<number, { count: number; tasks: WorkforceTask[] }>>) {
@@ -601,13 +649,13 @@ export default function WorkforcePage() {
       for (let i = 0; i < weeks.length; i++) s.getColumn(3 + i).width = 7;
     }
 
-    // ---- Sheet 2: Kişi Bazlı ----
+    // ---- Sheet 3: Kişi Bazlı ----
     buildCalendarSheet('Kişi Bazlı', 'CAE Mühendisi', sortedPeople.map(p => p.name), personWeekLoad);
 
-    // ---- Sheet 3: Proje Bazlı ----
+    // ---- Sheet 4: Proje Bazlı ----
     buildCalendarSheet('Proje Bazlı', 'Proje', projects, projectWeekLoad);
 
-    // ---- Sheet 4: Data Geldi Tarihleri ----
+    // ---- Sheet 5: Data Geldi Tarihleri ----
     const wsDa = wb.addWorksheet('Data Geldi Tarihleri', {
       views: [{ state: 'frozen', xSplit: 0, ySplit: 1 }],
     });
@@ -683,7 +731,7 @@ export default function WorkforcePage() {
     wsDa.getColumn(6).width = 22;
     wsDa.getColumn(7).width = 24;
 
-    // ---- Sheet 5: Kişi Özeti ----
+    // ---- Sheet 6: Kişi Özeti ----
     const ws3 = wb.addWorksheet('Kişi Özeti');
     const pHeader = ws3.getRow(1);
     pHeader.height = 26;
