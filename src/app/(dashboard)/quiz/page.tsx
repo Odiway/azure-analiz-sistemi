@@ -260,8 +260,7 @@ export default function QuizPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex gap-4">
-        {/* Main content */}
-        <div className={`${session && (session.status === 'waiting' || session.status === 'active') ? 'flex-1 min-w-0' : 'w-full max-w-4xl mx-auto'} space-y-6`}>
+        <div className="flex-1 min-w-0 space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -700,8 +699,7 @@ export default function QuizPage() {
         </div>
 
         {/* Chat Panel - Side */}
-        {session && (session.status === 'waiting' || session.status === 'active') && (
-          <div className="w-72 flex-shrink-0">
+        <div className="w-72 flex-shrink-0">
             <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 h-[500px] flex flex-col sticky top-4">
               <div className="p-3 border-b border-navy-100 dark:border-navy-700 flex items-center gap-2">
                 <MessageCircle className="w-4 h-4 text-purple-500" />
@@ -751,7 +749,6 @@ export default function QuizPage() {
               )}
             </div>
           </div>
-        )}
       </div>
     </div>
   );
