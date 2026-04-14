@@ -335,7 +335,7 @@ export default function QuizPage() {
                         i === 2 ? 'bg-orange-400 text-white' :
                         'bg-navy-200 dark:bg-navy-700 text-navy-600 dark:text-navy-300'
                       }`}>
-                        {i < 3 ? ['g���', 'g���', 'g���'][i] : i + 1}
+                        {i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}
                       </div>
                       <div className="flex-1">
                         <span className="font-semibold text-navy-900 dark:text-white">{entry.user_name}</span>
@@ -392,7 +392,7 @@ export default function QuizPage() {
                             i === 1 ? 'bg-gray-50 dark:bg-gray-500/10' :
                             'bg-orange-50 dark:bg-orange-500/10'
                           }`}>
-                            <div className="text-3xl mb-1">{['g���', 'g���', 'g���'][i]}</div>
+                            <div className="text-3xl mb-1">{['🥇', '🥈', '🥉'][i]}</div>
                             <div className="font-bold text-navy-900 dark:text-white">{p.user_name}</div>
                             <div className="text-sm text-amber-600 dark:text-amber-400 font-medium">{p.score.toLocaleString()} puan</div>
                           </div>
@@ -650,7 +650,7 @@ export default function QuizPage() {
                           : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400'
                       }`}>
                         {answerResult.correct
-                          ? `g�?� Doğru! +${answerResult.score} puan`
+                          ? `✅ Doğru! +${answerResult.score} puan`
                           : '❌ Yanlış!'}
                       </div>
                     )}
@@ -689,7 +689,7 @@ export default function QuizPage() {
               {session && session.status === 'finished' && session.participants && (
                 <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 p-8 text-center">
                   <div className="mb-6">
-                    <div className="text-6xl mb-3">g���</div>
+                    <div className="text-6xl mb-3">🏆</div>
                     <h2 className="text-2xl font-bold text-navy-900 dark:text-white">Yarışma Bitti!</h2>
                   </div>
                   <div className="flex justify-center gap-6 mb-6">
