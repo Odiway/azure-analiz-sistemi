@@ -725,8 +725,7 @@ export default function QuizPage() {
                 ))}
                 <div ref={chatEndRef} />
               </div>
-              {isInSession && (
-                <div className="p-2 border-t border-navy-100 dark:border-navy-700">
+              <div className="p-2 border-t border-navy-100 dark:border-navy-700">
                   <div className="flex gap-1.5">
                     <input
                       type="text"
@@ -739,14 +738,13 @@ export default function QuizPage() {
                     />
                     <button
                       onClick={sendChat}
-                      disabled={!chatInput.trim()}
+                      disabled={!chatInput.trim() || !session}
                       className="px-2.5 py-1.5 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50"
                     >
                       <Send className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           </div>
       </div>
