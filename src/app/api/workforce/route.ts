@@ -147,10 +147,19 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
+    const sql = getSQL();
     const baseTasks = parseExcelBase();
     const tasks = await applyOverrides(baseTasks);
     const { people, projects } = buildSummary(tasks);
-    return NextResponse.json({ tasks, people, projects });
+
+    // Load data_arrived marks
+    const daRows = await sql('SELECT row_index, week FROM workforce_data_arrived');
+    const dataArrived: Record<string, boolean> = {};
+    for (const r of daRows) {
+      dataArrived[`${r.row_index}_${r.week}`] = true;
+    }
+
+    return NextResponse.json({ tasks, people, projects, dataArrived });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Excel parse error' }, { status: 500 });
   }
@@ -162,9 +171,10 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const updates: { rowIndex: number; week: number; value: number }[] = body.updates;
+    const updates: { rowIndex: number; week: number; value: number }[] = body.updates || [];
+    const dataArrivedUpdates: { rowIndex: number; week: number; add: boolean }[] = body.dataArrivedUpdates || [];
 
-    if (!Array.isArray(updates) || updates.length === 0) {
+    if (updates.length === 0 && dataArrivedUpdates.length === 0) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
     }
 
@@ -177,6 +187,15 @@ export async function POST(req: Request) {
       }
       if (typeof u.value !== 'number' || u.value < 0) {
         return NextResponse.json({ error: 'Invalid value' }, { status: 400 });
+      }
+    }
+
+    for (const u of dataArrivedUpdates) {
+      if (typeof u.rowIndex !== 'number' || u.rowIndex < 9) {
+        return NextResponse.json({ error: 'Invalid rowIndex in dataArrived' }, { status: 400 });
+      }
+      if (typeof u.week !== 'number' || u.week < 1 || u.week > 52) {
+        return NextResponse.json({ error: 'Invalid week in dataArrived' }, { status: 400 });
       }
     }
 
@@ -199,11 +218,35 @@ export async function POST(req: Request) {
       }
     }
 
+    // Insert/delete data_arrived marks
+    for (const { rowIndex, week, add } of dataArrivedUpdates) {
+      if (add) {
+        await sql(
+          `INSERT INTO workforce_data_arrived (row_index, week)
+           VALUES ($1, $2)
+           ON CONFLICT (row_index, week) DO NOTHING`,
+          [rowIndex, week]
+        );
+      } else {
+        await sql(
+          'DELETE FROM workforce_data_arrived WHERE row_index = $1 AND week = $2',
+          [rowIndex, week]
+        );
+      }
+    }
+
     // Return fresh data
     const baseTasks = parseExcelBase();
     const tasks = await applyOverrides(baseTasks);
     const { people, projects } = buildSummary(tasks);
-    return NextResponse.json({ tasks, people, projects });
+
+    const daRows = await sql('SELECT row_index, week FROM workforce_data_arrived');
+    const dataArrived: Record<string, boolean> = {};
+    for (const r of daRows) {
+      dataArrived[`${r.row_index}_${r.week}`] = true;
+    }
+
+    return NextResponse.json({ tasks, people, projects, dataArrived });
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Update error' }, { status: 500 });
   }
