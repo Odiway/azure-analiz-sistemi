@@ -320,10 +320,16 @@ export default function WorkforcePage() {
       'FEF9C3', 'FEF3C7', 'FFEDD5', 'FFE4E6', 'FCE7F3', 'F3E8FF',
     ];
 
-    // ---- Sheet 1: İş Gücü Planı ----
-    const ws = wb.addWorksheet('İş Gücü Planı', {
+    // ---- Sheet 1: Gantt ----
+    const ws = wb.addWorksheet('Gantt', {
       views: [{ state: 'frozen', xSplit: 6, ySplit: 3 }],
     });
+
+    // Project color hex map (strip # from PROJECT_DOT_COLORS)
+    const PROJ_HEX: Record<string, string> = {};
+    for (const [k, v] of Object.entries(PROJECT_DOT_COLORS)) {
+      PROJ_HEX[k] = v.replace('#', '');
+    }
 
     // Row 1: Month headers
     const monthRow = ws.getRow(1);
@@ -419,14 +425,15 @@ export default function WorkforcePage() {
         const cell = row.getCell(7 + wi);
         const val = task.weeks[w.week];
         const isDA = !!dataArrived[`${task.rowIndex}_${w.week}`];
-        cell.value = val || null;
+        const projHex = PROJ_HEX[task.project] || '6B7280';
         if (val) {
+          cell.value = '';
           if (isDA) {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFED7AA' } }; // orange-200
-            cell.font = { size: 9, bold: true, color: { argb: 'FF9A3412' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF97316' } }; // orange
+            cell.font = { size: 7, color: { argb: 'FFFFFFFF' } };
           } else {
-            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${MONTH_LIGHT_HEX[w.month]}` } };
-            cell.font = { size: 9, bold: true, color: { argb: 'FF1E293B' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: `FF${projHex}` } };
+            cell.font = { size: 7, color: { argb: `FF${projHex}` } };
           }
         } else {
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
