@@ -231,6 +231,41 @@ export default function WorkforcePage() {
     return totals;
   }, [filteredTasks]);
 
+  // First week per task (data start / orange marker)
+  const taskFirstWeek = useMemo(() => {
+    const map: Record<number, number> = {}; // rowIndex -> first week
+    for (const task of filteredTasks) {
+      const weekNums = Object.keys(task.weeks).map(Number).sort((a, b) => a - b);
+      if (weekNums.length > 0) {
+        map[task.rowIndex] = weekNums[0];
+      }
+    }
+    return map;
+  }, [filteredTasks]);
+
+  // For person/project view: which weeks have a task starting
+  const personStartWeeks = useMemo(() => {
+    const map: Record<string, Set<number>> = {};
+    for (const task of filteredTasks) {
+      const p = task.caeResp;
+      if (!map[p]) map[p] = new Set();
+      const weekNums = Object.keys(task.weeks).map(Number).sort((a, b) => a - b);
+      if (weekNums.length > 0) map[p].add(weekNums[0]);
+    }
+    return map;
+  }, [filteredTasks]);
+
+  const projectStartWeeks = useMemo(() => {
+    const map: Record<string, Set<number>> = {};
+    for (const task of filteredTasks) {
+      const prj = task.project;
+      if (!map[prj]) map[prj] = new Set();
+      const weekNums = Object.keys(task.weeks).map(Number).sort((a, b) => a - b);
+      if (weekNums.length > 0) map[prj].add(weekNums[0]);
+    }
+    return map;
+  }, [filteredTasks]);
+
   useEffect(() => {
     fetch('/api/workforce')
       .then(r => r.ok ? r.json() : null)
@@ -591,6 +626,8 @@ export default function WorkforcePage() {
                       {weeks.map(w => {
                         const wd = weekData[w.week];
                         const load = wd?.count || 0;
+                        const startWeeks = viewMode === 'person' ? personStartWeeks[rowName] : projectStartWeeks[rowName];
+                        const isStartWeek = startWeeks?.has(w.week) || false;
 
                         return (
                           <td
@@ -598,14 +635,19 @@ export default function WorkforcePage() {
                             className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] relative cursor-pointer
                               ${w.isCurrent ? 'bg-azure-50/70 dark:bg-azure-500/10 border-x border-azure-200 dark:border-azure-700' : ''}
                               ${load === 0 ? 'hover:bg-gray-100 dark:hover:bg-navy-700' : 'hover:opacity-75'}`}
-                            title={wd ? `W${w.week}: ${load} analiz — düzenlemek için tıkla` : `W${w.week} — eklemek için tıkla`}
+                            title={wd ? `W${w.week}: ${load} analiz${isStartWeek ? ' (başlangıç)' : ''} — düzenlemek için tıkla` : `W${w.week} — eklemek için tıkla`}
                             onClick={(e) => handleCellPopup(e, rowName, w.week)}
                           >
-                            {load > 0 && (
-                              <div className={`mx-auto w-full h-full min-h-[24px] flex items-center justify-center ${getLoadColor(load)}`}>
+                            {load > 0 ? (
+                              <div className={`mx-auto w-full h-full min-h-[24px] flex items-center justify-center ${isStartWeek ? 'bg-orange-200 dark:bg-orange-500/30 text-orange-800 dark:text-orange-200 ring-1 ring-inset ring-orange-400/50' : getLoadColor(load)}`}>
                                 <span className="font-bold text-[10px]">{load}</span>
+                                {isStartWeek && <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-orange-500 rounded-full" />}
                               </div>
-                            )}
+                            ) : isStartWeek ? (
+                              <div className="mx-auto w-full h-full min-h-[24px] flex items-center justify-center bg-orange-100 dark:bg-orange-500/15">
+                                <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-orange-500 rounded-full" />
+                              </div>
+                            ) : null}
                           </td>
                         );
                       })}
@@ -708,20 +750,21 @@ export default function WorkforcePage() {
                       </td>
                       {weeks.map(w => {
                         const hasWork = task.weeks[w.week];
+                        const isFirstWeek = taskFirstWeek[task.rowIndex] === w.week;
                         return (
                           <td
                             key={w.week}
-                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] cursor-pointer
+                            className={`text-center border-b border-gray-100 dark:border-navy-800 px-0 py-0 min-w-[28px] cursor-pointer relative
                               ${w.isCurrent ? 'border-x border-azure-200 dark:border-azure-700' : ''}
                               ${!hasWork ? 'hover:bg-gray-100 dark:hover:bg-navy-700' : 'hover:opacity-60'}`}
                             onClick={() => toggleTaskWeek(task, w.week)}
-                            title={hasWork ? `${task.name} - W${w.week} (kaldırmak için tıkla)` : `W${w.week} (eklemek için tıkla)`}
+                            title={hasWork ? `${task.name} - W${w.week}${isFirstWeek ? ' (başlangıç)' : ''} (kaldırmak için tıkla)` : `W${w.week} (eklemek için tıkla)`}
                           >
                             {hasWork ? (
                               <div
-                                className="w-full h-[20px] opacity-80 transition-all"
-                                style={{ backgroundColor: projColor }}
-                                title={`${task.name} - W${w.week}`}
+                                className={`w-full h-[20px] transition-all ${isFirstWeek ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+                                style={{ backgroundColor: isFirstWeek ? '#F97316' : projColor, opacity: isFirstWeek ? 1 : 0.8 }}
+                                title={`${task.name} - W${w.week}${isFirstWeek ? ' (başlangıç)' : ''}`}
                               />
                             ) : null}
                           </td>
@@ -983,6 +1026,8 @@ export default function WorkforcePage() {
           <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-yellow-100 dark:bg-yellow-500/20" /><span className="text-gray-500">2 (Orta)</span></div>
           <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-orange-100 dark:bg-orange-500/20" /><span className="text-gray-500">3 (Yoğun)</span></div>
           <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-red-100 dark:bg-red-500/20" /><span className="text-gray-500">4+ (Aşırı)</span></div>
+          <span className="text-gray-300 dark:text-gray-600">|</span>
+          <div className="flex items-center gap-1"><div className="w-4 h-3 rounded bg-orange-400 ring-1 ring-orange-500" /><span className="text-gray-500 font-semibold">Başlangıç (Data Geldi)</span></div>
         </div>
       </div>
     </div>
