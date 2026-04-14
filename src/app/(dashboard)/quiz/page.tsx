@@ -84,7 +84,7 @@ export default function QuizPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [showTab, setShowTab] = useState<'game' | 'leaderboard'>('game');
-  const [chatOpen, setChatOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(true);
   const lastQuestionRef = useRef(0);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -274,19 +274,6 @@ export default function QuizPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              {session && (session.status === 'waiting' || session.status === 'active') && (
-                <button
-                  onClick={() => setChatOpen(!chatOpen)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all relative ${
-                    chatOpen
-                      ? 'bg-purple-500 text-white shadow-md shadow-purple-500/30'
-                      : 'bg-white/60 dark:bg-navy-800/60 text-navy-600 dark:text-navy-300 hover:bg-white dark:hover:bg-navy-700'
-                  }`}
-                >
-                  <MessageCircle className="w-4 h-4 inline mr-1" />
-                  Sohbet
-                </button>
-              )}
               <button
                 onClick={() => setShowTab('game')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -713,7 +700,7 @@ export default function QuizPage() {
         </div>
 
         {/* Chat Panel - Side */}
-        {chatOpen && session && (session.status === 'waiting' || session.status === 'active') && (
+        {session && (session.status === 'waiting' || session.status === 'active') && (
           <div className="w-72 flex-shrink-0">
             <div className="bg-white/70 dark:bg-navy-900/70 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 dark:border-navy-700/30 h-[500px] flex flex-col sticky top-4">
               <div className="p-3 border-b border-navy-100 dark:border-navy-700 flex items-center gap-2">
