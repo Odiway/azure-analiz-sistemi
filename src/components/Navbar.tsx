@@ -3,7 +3,7 @@
 import { signOut, useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Server, LogOut, User, Monitor, Settings, Sun, Moon, Briefcase, Users } from 'lucide-react';
+import { Server, LogOut, User, Monitor, Settings, Sun, Moon, Briefcase, Users, Trophy } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
@@ -76,6 +76,17 @@ export default function Navbar() {
               <Settings className="w-4 h-4" />
               <span className="hidden sm:inline">Ayarlar</span>
             </Link>
+            <Link
+              href="/quiz"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === '/quiz'
+                  ? 'bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                  : 'text-navy-500 dark:text-navy-300 hover:bg-gray-50 dark:hover:bg-navy-800 hover:text-navy-700 dark:hover:text-white'
+              }`}
+            >
+              <Trophy className="w-4 h-4" />
+              <span className="hidden sm:inline">Yarışma</span>
+            </Link>
           </div>
 
           {/* User Info, Theme Toggle & Logout */}
@@ -87,10 +98,34 @@ export default function Navbar() {
             {mounted && (
               <button
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="flex items-center justify-center w-9 h-9 rounded-lg text-navy-500 dark:text-navy-300 hover:bg-gray-100 dark:hover:bg-navy-800 transition-colors"
+                className={`group relative flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-sm font-extrabold tracking-wide transition-all duration-500 shadow-lg hover:shadow-2xl hover:scale-110 active:scale-95 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-400 text-white shadow-amber-400/40 hover:shadow-amber-400/60'
+                    : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-indigo-500/40 hover:shadow-indigo-500/60'
+                }`}
                 title={theme === 'dark' ? 'Açık mod' : 'Koyu mod'}
               >
-                {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
+                <span className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-yellow-300 via-amber-400 to-orange-500'
+                    : 'bg-gradient-to-r from-purple-400 via-pink-500 to-rose-500'
+                }`} />
+                <span className="relative flex items-center gap-2">
+                  {theme === 'dark' ? (
+                    <Sun className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" />
+                  ) : (
+                    <Moon className="w-5 h-5 group-hover:-rotate-12 transition-transform duration-700" />
+                  )}
+                  <span className="hidden sm:inline text-xs uppercase">{theme === 'dark' ? 'Açık' : 'Koyu'}</span>
+                </span>
+                <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    theme === 'dark' ? 'bg-yellow-300' : 'bg-pink-400'
+                  }`} />
+                  <span className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white dark:border-navy-900 ${
+                    theme === 'dark' ? 'bg-yellow-400' : 'bg-pink-500'
+                  }`} />
+                </span>
               </button>
             )}
             <button
