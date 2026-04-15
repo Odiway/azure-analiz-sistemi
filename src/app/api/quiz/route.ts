@@ -185,6 +185,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { action, userName, sessionId, selectedOption, questionNumber, message } = body;
 
+    if (action === 'resetPoints') {
+      if (userName !== 'Oğuzhan İnandı') return NextResponse.json({ error: 'Yetkiniz yok' }, { status: 403 });
+      await sql`UPDATE quiz_participants SET score = 0, rank = NULL`;
+      await sql`DELETE FROM quiz_answers`;
+      await sql`UPDATE quiz_sessions SET status = 'finished', finished_at = NOW() WHERE status IN ('waiting', 'active')`;
+      return NextResponse.json({ reset: true });
+    }
+
     if (action === 'forceCreate') {
       if (userName !== 'Oğuzhan İnandı') return NextResponse.json({ error: 'Yetkiniz yok' }, { status: 403 });
       const existing = await sql`SELECT id FROM quiz_sessions WHERE status IN ('waiting', 'active') LIMIT 1`;

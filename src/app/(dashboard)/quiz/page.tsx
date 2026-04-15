@@ -303,6 +303,23 @@ export default function QuizPage() {
               <h2 className="text-xl font-bold text-navy-900 dark:text-white mb-4 flex items-center gap-2">
                 <Crown className="w-5 h-5 text-amber-500" />
                 Tüm Zamanlar Sıralaması
+                {userName === 'Oğuzhan İnandı' && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Tüm puanlar sıfırlanacak. Emin misin?')) return;
+                      await fetch('/api/quiz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'resetPoints', userName }),
+                      });
+                      fetchLeaderboard();
+                      fetchStatus();
+                    }}
+                    className="ml-auto px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+                  >
+                    Puanları Sıfırla
+                  </button>
+                )}
               </h2>
               {leaderboard.length === 0 ? (
                 <p className="text-center text-navy-500 dark:text-navy-400 py-8">Henüz yarışma yapılmamış</p>
