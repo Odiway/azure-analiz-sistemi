@@ -31,6 +31,8 @@ interface QuestionData {
   option_b: string;
   option_c: string;
   option_d: string;
+  option_e?: string | null;
+  image_url?: string | null;
   category: string;
 }
 
@@ -243,18 +245,20 @@ export default function QuizPage() {
     ((Date.now() - new Date(session.question_started_at).getTime()) / 1000) > config.questionTime;
   const showReveal = isRevealing || allAnswered;
 
-  const optionLabels = ['A', 'B', 'C', 'D'];
+  const optionLabels = ['A', 'B', 'C', 'D', 'E'];
   const optionColors = [
     'from-blue-500 to-blue-600',
     'from-emerald-500 to-emerald-600',
     'from-amber-500 to-amber-600',
     'from-rose-500 to-rose-600',
+    'from-violet-500 to-violet-600',
   ];
   const optionBorders = [
     'border-blue-400 hover:border-blue-300',
     'border-emerald-400 hover:border-emerald-300',
     'border-amber-400 hover:border-amber-300',
     'border-rose-400 hover:border-rose-300',
+    'border-violet-400 hover:border-violet-300',
   ];
 
   return (
@@ -573,9 +577,28 @@ export default function QuizPage() {
                       {currentQuestion.question}
                     </h2>
 
+                    {/* Soru görseli */}
+                    {currentQuestion.image_url && (
+                      <div className="flex justify-center mb-6">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={currentQuestion.image_url}
+                          alt="Soru görseli"
+                          className="max-h-56 rounded-xl object-contain shadow-md border border-navy-100 dark:border-navy-700 bg-white p-2"
+                        />
+                      </div>
+                    )}
+
                     {/* Options */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {(['A', 'B', 'C', 'D'] as const).map((opt, i) => {
+                      {(['A', 'B', 'C', 'D', 'E'] as const)
+                        .filter((opt) => {
+                          const k = `option_${opt.toLowerCase()}` as keyof QuestionData;
+                          const v = currentQuestion[k];
+                          return v !== null && v !== undefined && String(v).trim() !== '';
+                        })
+                        .map((opt) => {
+                        const i = opt.charCodeAt(0) - 65;
                         const optionKey = `option_${opt.toLowerCase()}` as keyof QuestionData;
                         const optionText = currentQuestion[optionKey] as string;
                         const isSelected = selectedAnswer === opt;

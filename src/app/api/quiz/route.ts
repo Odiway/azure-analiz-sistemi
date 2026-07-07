@@ -7,16 +7,61 @@ const QUESTION_TIME_SECONDS = 30;
 const REVEAL_TIME_SECONDS = 5;
 const MIN_PLAYERS = 2;
 const THREE_MONTHS_AGO = 90;
+const WEEK_BUCKETS = 8;
+const DIFFICULTY_BONUS_PER_PLAYER = 100;
+
+// ISO hafta numarası – haftalık soru rotasyonu için
+function getWeekNumber(d = new Date()) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - dayNum + 3);
+  const firstThursday = date.getTime();
+  date.setUTCMonth(0, 1);
+  if (date.getUTCDay() !== 4) {
+    date.setUTCMonth(0, 1 + ((4 - date.getUTCDay()) + 7) % 7);
+  }
+  return 1 + Math.ceil((firstThursday - date.getTime()) / (7 * 24 * 3600 * 1000));
+}
+
+// Zorluk bonusu: bir soruyu ne kadar az kişi doğru bildiyse, doğru bilenler o kadar
+// çok ekstra puan alır. Soru kapanırken (bir sonrakine geçerken) uygulanır.
+async function applyDifficultyBonus(sql: ReturnType<typeof getSQL>, sessionId: number, questionNumber: number) {
+  const totalRes = await sql`SELECT COUNT(*)::int as cnt FROM quiz_participants WHERE session_id = ${sessionId}`;
+  const total = (totalRes[0]?.cnt as number) || 0;
+  const correct = await sql`
+    SELECT participant_id FROM quiz_answers
+    WHERE session_id = ${sessionId} AND question_number = ${questionNumber} AND is_correct = TRUE
+  `;
+  const correctCount = correct.length;
+  if (correctCount === 0 || total <= correctCount) return;
+
+  const bonus = DIFFICULTY_BONUS_PER_PLAYER * (total - correctCount);
+  for (const row of correct) {
+    const pid = row.participant_id as number;
+    await sql`UPDATE quiz_participants SET score = score + ${bonus} WHERE id = ${pid}`;
+    await sql`UPDATE quiz_answers SET score = score + ${bonus} WHERE session_id = ${sessionId} AND question_number = ${questionNumber} AND participant_id = ${pid}`;
+  }
+}
 
 async function startGame(sql: ReturnType<typeof getSQL>, sessionId: number) {
   const threeMonthsAgo = new Date();
   threeMonthsAgo.setDate(threeMonthsAgo.getDate() - THREE_MONTHS_AGO);
+  const bucket = getWeekNumber() % WEEK_BUCKETS;
 
+  // Haftalık rotasyon: her hafta farklı bir soru kovası öne çıkar
   let questions = await sql`
     SELECT id FROM quiz_questions 
-    WHERE last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()}
+    WHERE (id % ${WEEK_BUCKETS}) = ${bucket}
+      AND (last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()})
     ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}
   `;
+  if (questions.length < QUESTIONS_PER_SESSION) {
+    questions = await sql`
+      SELECT id FROM quiz_questions 
+      WHERE last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()}
+      ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}
+    `;
+  }
   if (questions.length < QUESTIONS_PER_SESSION) {
     questions = await sql`SELECT id FROM quiz_questions ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}`;
   }
@@ -67,7 +112,7 @@ export async function GET(req: Request) {
         const qIndex = session.current_question - 1;
         if (qIndex < qIds.length) {
           const qId = qIds[qIndex];
-          const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, category FROM quiz_questions WHERE id = ${qId}`;
+          const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, option_e, image_url, category FROM quiz_questions WHERE id = ${qId}`;
           if (qs.length > 0) currentQuestion = qs[0];
         }
 
@@ -102,19 +147,28 @@ export async function GET(req: Request) {
         }
 
         if (shouldAdvance) {
-          const nextQ = (session.current_question || 0) + 1;
+          const closingQuestion = session.current_question;
+          const nextQ = (closingQuestion || 0) + 1;
           if (nextQ > QUESTIONS_PER_SESSION) {
-            await sql`UPDATE quiz_sessions SET status = 'finished', finished_at = NOW() WHERE id = ${session.id}`;
-            const ranked = await sql`SELECT id, score FROM quiz_participants WHERE session_id = ${session.id} ORDER BY score DESC`;
-            for (let i = 0; i < ranked.length; i++) {
-              await sql`UPDATE quiz_participants SET rank = ${i + 1} WHERE id = ${ranked[i].id}`;
+            // Atomik geçiş: yalnızca 'active' -> 'finished' geçişini yapan istek bonusu uygular
+            const claimed = await sql`UPDATE quiz_sessions SET status = 'finished', finished_at = NOW() WHERE id = ${session.id} AND status = 'active' RETURNING id`;
+            if (claimed.length > 0) {
+              await applyDifficultyBonus(sql, session.id, closingQuestion);
+              const ranked = await sql`SELECT id, score FROM quiz_participants WHERE session_id = ${session.id} ORDER BY score DESC`;
+              for (let i = 0; i < ranked.length; i++) {
+                await sql`UPDATE quiz_participants SET rank = ${i + 1} WHERE id = ${ranked[i].id}`;
+              }
             }
             session = { ...session, status: 'finished' };
           } else {
-            await sql`UPDATE quiz_sessions SET current_question = ${nextQ}, question_started_at = NOW() WHERE id = ${session.id}`;
+            // Atomik geçiş: yalnızca current_question'ı ilerleten istek bonusu uygular
+            const claimed = await sql`UPDATE quiz_sessions SET current_question = ${nextQ}, question_started_at = NOW() WHERE id = ${session.id} AND current_question = ${closingQuestion} RETURNING id`;
+            if (claimed.length > 0) {
+              await applyDifficultyBonus(sql, session.id, closingQuestion);
+            }
             session = { ...session, current_question: nextQ };
             const qId = session.question_ids[nextQ - 1];
-            const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, category FROM quiz_questions WHERE id = ${qId}`;
+            const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, option_e, image_url, category FROM quiz_questions WHERE id = ${qId}`;
             if (qs.length > 0) currentQuestion = qs[0];
             answers = [];
             allAnswered = false;
@@ -131,7 +185,7 @@ export async function GET(req: Request) {
           const qIds = await startGame(sql, session.id);
           session = { ...session, status: 'active', current_question: 1, question_ids: qIds };
           const qId = qIds[0];
-          const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, category FROM quiz_questions WHERE id = ${qId}`;
+          const qs = await sql`SELECT id, question, option_a, option_b, option_c, option_d, option_e, image_url, category FROM quiz_questions WHERE id = ${qId}`;
           if (qs.length > 0) currentQuestion = qs[0];
         }
       }

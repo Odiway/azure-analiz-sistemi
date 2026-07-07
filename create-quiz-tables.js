@@ -5,7 +5,7 @@ const dbUrl = envContent.split('\n').find(l => l.startsWith('DATABASE_URL=')).re
 const sql = neon(dbUrl);
 
 async function run() {
-  await sql('CREATE TABLE IF NOT EXISTS quiz_questions (id SERIAL PRIMARY KEY, question TEXT NOT NULL, option_a TEXT NOT NULL, option_b TEXT NOT NULL, option_c TEXT NOT NULL, option_d TEXT NOT NULL, correct_option CHAR(1) NOT NULL, category TEXT NOT NULL, last_used_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW())');
+  await sql('CREATE TABLE IF NOT EXISTS quiz_questions (id SERIAL PRIMARY KEY, question TEXT NOT NULL, option_a TEXT NOT NULL, option_b TEXT NOT NULL, option_c TEXT NOT NULL, option_d TEXT NOT NULL, option_e TEXT, image_url TEXT, correct_option CHAR(1) NOT NULL, category TEXT NOT NULL, last_used_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW())');
   console.log('quiz_questions OK');
 
   await sql("CREATE TABLE IF NOT EXISTS quiz_sessions (id SERIAL PRIMARY KEY, status TEXT NOT NULL DEFAULT 'waiting', current_question INTEGER DEFAULT 0, question_ids INTEGER[] DEFAULT ARRAY[]::INTEGER[], question_started_at TIMESTAMP, started_at TIMESTAMP, finished_at TIMESTAMP, created_at TIMESTAMP DEFAULT NOW())");
