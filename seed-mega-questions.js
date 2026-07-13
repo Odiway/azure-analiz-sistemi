@@ -185,6 +185,10 @@ async function run() {
     const oe = n > 4 ? finals[4] : null;
     const img = item.img || null;
 
+    // Aynı soru + aynı seçenekler zaten varsa ekleme (duplikat koruması)
+    const existing = await sql`SELECT id FROM quiz_questions WHERE question = ${item.q} AND option_a = ${oa} LIMIT 1`;
+    if (existing.length > 0) { continue; }
+
     await sql`
       INSERT INTO quiz_questions (question, option_a, option_b, option_c, option_d, option_e, image_url, correct_option, category)
       VALUES (${item.q}, ${oa}, ${ob}, ${oc}, ${od}, ${oe}, ${img}, ${newCorrect}, ${item.cat})
