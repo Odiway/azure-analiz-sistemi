@@ -48,25 +48,66 @@ async function startGame(sql: ReturnType<typeof getSQL>, sessionId: number) {
   threeMonthsAgo.setDate(threeMonthsAgo.getDate() - THREE_MONTHS_AGO);
   const bucket = getWeekNumber() % WEEK_BUCKETS;
 
-  // Haftalık rotasyon: her hafta farklı bir soru kovası öne çıkar
-  let questions = await sql`
-    SELECT id FROM quiz_questions 
-    WHERE (id % ${WEEK_BUCKETS}) = ${bucket}
-      AND (last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()})
-    ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}
+  // Her oyunda garantili: 2 görsel soru + 1 müzik sorusu
+  const visualQs = await sql`
+    SELECT id FROM quiz_questions
+    WHERE image_url IS NOT NULL AND image_url <> ''
+    ORDER BY RANDOM() LIMIT 2
   `;
-  if (questions.length < QUESTIONS_PER_SESSION) {
-    questions = await sql`
-      SELECT id FROM quiz_questions 
-      WHERE last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()}
-      ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}
+  const musicQs = await sql`
+    SELECT id FROM quiz_questions
+    WHERE category = 'Müzik'
+    ORDER BY RANDOM() LIMIT 1
+  `;
+
+  const fixedIds: number[] = [
+    ...visualQs.map((q: Record<string, unknown>) => q.id as number),
+    ...musicQs.map((q: Record<string, unknown>) => q.id as number),
+  ];
+  const needed = QUESTIONS_PER_SESSION - fixedIds.length;
+  const fillIds: number[] = [];
+
+  // Haftalık kova – öncelikli dolgu
+  if (fillIds.length < needed) {
+    const exc = [...fixedIds, ...fillIds];
+    const r = await sql`
+      SELECT id FROM quiz_questions
+      WHERE id != ALL(${exc})
+        AND (id % ${WEEK_BUCKETS}) = ${bucket}
+        AND (last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()})
+      ORDER BY RANDOM() LIMIT ${needed - fillIds.length}
     `;
+    fillIds.push(...r.map((q: Record<string, unknown>) => q.id as number));
   }
-  if (questions.length < QUESTIONS_PER_SESSION) {
-    questions = await sql`SELECT id FROM quiz_questions ORDER BY RANDOM() LIMIT ${QUESTIONS_PER_SESSION}`;
+  // Son 3 ayda görülmemiş
+  if (fillIds.length < needed) {
+    const exc = [...fixedIds, ...fillIds];
+    const r = await sql`
+      SELECT id FROM quiz_questions
+      WHERE id != ALL(${exc})
+        AND (last_used_at IS NULL OR last_used_at < ${threeMonthsAgo.toISOString()})
+      ORDER BY RANDOM() LIMIT ${needed - fillIds.length}
+    `;
+    fillIds.push(...r.map((q: Record<string, unknown>) => q.id as number));
+  }
+  // Kalan her soru
+  if (fillIds.length < needed) {
+    const exc = [...fixedIds, ...fillIds];
+    const r = await sql`
+      SELECT id FROM quiz_questions
+      WHERE id != ALL(${exc})
+      ORDER BY RANDOM() LIMIT ${needed - fillIds.length}
+    `;
+    fillIds.push(...r.map((q: Record<string, unknown>) => q.id as number));
   }
 
-  const qIds = questions.map((q: Record<string, unknown>) => q.id as number);
+  // Tüm seçilen soruları karıştır
+  const allIds: number[] = [...fixedIds, ...fillIds];
+  for (let i = allIds.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allIds[i], allIds[j]] = [allIds[j], allIds[i]];
+  }
+  const qIds = allIds.slice(0, QUESTIONS_PER_SESSION);
 
   // Atomik başlangıç: yalnızca 'waiting' -> 'active' geçişini gerçekleştiren istek
   // soruları belirler. Eşzamanlı status isteklerinin oyunu iki kez başlatıp
