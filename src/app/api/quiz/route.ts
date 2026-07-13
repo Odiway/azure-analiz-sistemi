@@ -67,7 +67,22 @@ async function startGame(sql: ReturnType<typeof getSQL>, sessionId: number) {
   }
 
   const qIds = questions.map((q: Record<string, unknown>) => q.id as number);
-  await sql`UPDATE quiz_sessions SET status = 'active', current_question = 1, question_ids = ${qIds}, question_started_at = NOW(), started_at = NOW() WHERE id = ${sessionId}`;
+
+  // Atomik başlangıç: yalnızca 'waiting' -> 'active' geçişini gerçekleştiren istek
+  // soruları belirler. Eşzamanlı status isteklerinin oyunu iki kez başlatıp
+  // farklı soru setleri yazmasını (yarış durumu) önler.
+  const claimed = await sql`
+    UPDATE quiz_sessions
+    SET status = 'active', current_question = 1, question_ids = ${qIds}, question_started_at = NOW(), started_at = NOW()
+    WHERE id = ${sessionId} AND status = 'waiting'
+    RETURNING id
+  `;
+  if (claimed.length === 0) {
+    // Başka bir istek zaten başlattı; mevcut soru setini döndür
+    const existing = await sql`SELECT question_ids FROM quiz_sessions WHERE id = ${sessionId}`;
+    return existing.length > 0 && existing[0].question_ids ? existing[0].question_ids : qIds;
+  }
+
   for (const qId of qIds) {
     await sql`UPDATE quiz_questions SET last_used_at = NOW() WHERE id = ${qId}`;
   }
